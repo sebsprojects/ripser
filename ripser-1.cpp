@@ -17,16 +17,26 @@
 typedef float value_t;
 typedef int64_t index_t;
 
+const value_t INF = std::numeric_limits<value_t>::infinity();
+
 void check_overflow(index_t i) {
 	if (i < 0)
 		throw std::overflow_error("simplex index " +
-								  std::to_string((uint64_t)i) +
-		                          " in filtration is out of bounds");
+			std::to_string((uint64_t)i) +
+			" in filtration is out of bounds");
 }
 
 // The basic data-type for simplices, given by the index of the simplex
 // w.r.t. binomial numbering system and its (cached) diameter
 typedef std::pair<index_t, value_t> index_diameter_t;
+
+index_t get_index(const index_diameter_t i) {
+	return i.first;
+}
+
+value_t get_diameter(const index_diameter_t i) {
+	return i.second;
+}
 
 // Binomial lookup table
 class binomial_coeff_table {
@@ -45,7 +55,7 @@ public:
 	}
 
 	index_t operator()(index_t n, index_t k) const {
-		// TODO: Unsafe cases?
+		// TODO: Unsafe casts?
 		assert((size_t) n < B.size() && (size_t) k < B[n].size() && n >= k - 1);
 		return B[n][k];
 	}
@@ -57,7 +67,8 @@ struct compressed_lower_distance_matrix {
 	std::vector<value_t*> rows;
 
 	compressed_lower_distance_matrix(std::vector<value_t>&& _distances)
-	    : distances(std::move(_distances)), rows((1 + std::sqrt(1 + 8 * distances.size())) / 2) {
+	    : distances(std::move(_distances)),
+			rows((1 + std::sqrt(1 + 8 * distances.size())) / 2) {
 		assert(distances.size() == size() * (size() - 1) / 2);
 		init_rows();
 	}
@@ -65,7 +76,6 @@ struct compressed_lower_distance_matrix {
 	compressed_lower_distance_matrix(const compressed_lower_distance_matrix& mat)
 	    : distances(mat.size() * (mat.size() - 1) / 2), rows(mat.size()) {
 		init_rows();
-
 		for (size_t i = 1; i < size(); ++i)
 			for (size_t j = 0; j < i; ++j) rows[i][j] = mat(i, j);
 	}
@@ -93,22 +103,122 @@ typedef struct compressed_lower_distance_matrix DistanceMatrix ;
  * *************************************************************************/
 
 class ripser {
+
+public:
 	const DistanceMatrix dist;
 	const index_t n;
 	const index_t dim_max;
 	const value_t threshold;
 	const float ratio;
 	const binomial_coeff_table binomial_coeff;
-
-	mutable std::vector<index_t> vertices;
-
-public:
+	
 	ripser(DistanceMatrix&& _dist, index_t _dim_max, value_t _threshold, float _ratio)
 		: dist(std::move(_dist)), n(dist.size()),
-			   dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
-			   threshold(_threshold), ratio(_ratio),
-			   binomial_coeff(n, dim_max + 2)
+		dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
+		threshold(_threshold), ratio(_ratio),
+		binomial_coeff(n, dim_max + 2)
 	{ }
+	
+	// For a k-simplex idx, return the vertex (of idx) of maximal index
+	// n is an upper bound for the search
+	index_t get_max_vertex(const index_t idx, const index_t k, const index_t n) const {
+		index_t top = n;
+		index_t bot = k - 1;
+		// Find max{ i | binomial_coeff(i,k) <= idx } via binary search
+		if(binomial_coeff(top, k) > idx) {
+			index_t count = top - bot;
+			while(count > 0) {
+				index_t half = count >> 1; // divide by 2
+				index_t mid = top - half;
+				if(binomial_coeff(mid, k) > idx) { // lower half
+					top = mid - 1;
+					count -= half + 1;
+				} else { // upper half
+					count = half;
+				}
+			}
+		}
+		return top;
+	}
+
+	// Write all vertices of the dim-simplex idx into vertices in ascending index order
+	// n is an upper bound on indices
+	void get_simplex_vertices(index_t idx, const index_t dim, index_t n,
+	                          std::vector<index_t>& vertices) const {
+		--n;
+		for(index_t k = dim + 1; k > 0; --k) {
+			n = get_max_vertex(idx, k, n);
+			vertices.at(k - 1) = n;
+			idx -= binomial_coeff(n, k);
+		}
+	}
+
+	// Compute the diameter for a k-simplex idx
+	// TODO(seb): dim vs k issue
+	value_t compute_diameter(const index_t idx, const index_t dim) const {
+		value_t diam = -INF;
+		std::vector<index_t> vertices(dim + 1, -1); // TODO(seb): Default value?
+		get_simplex_vertices(idx, dim, dist.size(), vertices);
+		for (index_t i = 0; i <= dim; ++i)
+			for (index_t j = 0; j < i; ++j) {
+				diam = std::max(diam, dist(vertices[i], vertices[j]));
+			}
+		return diam;
+	}
+
+	void assemble_columns_to_reduct(std::vector<index_diameter_t>& simplices,
+	                                std::vector<index_diameter_t>& columns_to_reduce,
+	                                index_t dim) {
+	
+	}
+
+	void compute_barcodes() {
+		std::vector<index_diameter_t> simplices, columns_to_reduce;
+	}
+};
+
+class simplex_boundary_enumerator {
+
+private:
+	const ripser& parent;
+
+	// Simplex to enumerate off given as ((index, diam), dim)
+	mutable index_diameter_t simplex;
+	mutable index_t dim;
+
+	// Ongoing enumeration
+	mutable index_t idx_below;
+	mutable index_t idx_above;
+	mutable index_t j;
+	mutable index_t k;
+
+public:
+	simplex_boundary_enumerator(const ripser& _parent) : parent(_parent)
+	{ }
+
+	void set_simplex(const index_diameter_t _simplex, const index_t _dim) {
+		idx_below = get_index(_simplex);
+		idx_above = 0;
+		j = parent.n - 1;
+		k = _dim;
+		simplex = _simplex;
+		dim = _dim;
+	}
+
+	bool has_next() {
+		return k >= 0;
+	}
+
+	index_diameter_t next() {
+		j = parent.get_max_vertex(idx_below, k + 1, j);
+		index_t face_index = idx_above - parent.binomial_coeff(j, k + 1) + idx_below;
+		value_t face_diameter = parent.compute_diameter(face_index, dim - 1);
+		// Update values for next call
+		idx_below -= parent.binomial_coeff(j, k + 1);
+		idx_above += parent.binomial_coeff(j, k);
+		--k;
+		return index_diameter_t(face_index, face_diameter);
+	}
 };
 
 
@@ -128,11 +238,12 @@ compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_
 
 int main(int argc, char** argv) {
 	const char* filename = nullptr;
-	if(argc == 1) {
+	if(argc == 2) {
 		filename = argv[1];
 	} else {
-		std::cout << "specify path to lower-distance matrix file as only arg"
+		std::cerr << "error: specify path to lower-distance matrix file as only arg"
 				  << std::endl;
+		exit(-1);
 	}
 
 	// Parameter setup
@@ -143,19 +254,19 @@ int main(int argc, char** argv) {
 	// Reading the distance matrix from file
 	std::ifstream file_stream(filename);
 	if (filename && file_stream.fail()) {
-		std::cerr << "couldn't open file " << filename << std::endl;
+		std::cerr << "error: couldn't open file " << filename << std::endl;
 		exit(-1);
 	}
 	DistanceMatrix dist = read_lower_distance_matrix(file_stream);
 
 	// Compute enclosing radius and distance bounds
-	value_t min = std::numeric_limits<value_t>::infinity(),
-			max = -std::numeric_limits<value_t>::infinity(),
+	value_t min = INF,
+			max = -INF,
 			max_finite = max;
 
-	value_t enclosing_radius = std::numeric_limits<value_t>::infinity();
+	value_t enclosing_radius = INF;
 	for (size_t i = 0; i < dist.size(); ++i) {
-		value_t r_i = -std::numeric_limits<value_t>::infinity();
+		value_t r_i = -INF;
 		for (size_t j = 0; j < dist.size(); ++j) r_i = std::max(r_i, dist(i, j));
 		enclosing_radius = std::min(enclosing_radius, r_i);
 	}
@@ -163,7 +274,7 @@ int main(int argc, char** argv) {
 	for (auto d : dist.distances) {
 		min = std::min(min, d);
 		max = std::max(max, d);
-		if (d != std::numeric_limits<value_t>::infinity()) max_finite = std::max(max_finite, d);
+		if (d != INF) max_finite = std::max(max_finite, d);
 	}
 	std::cout << "value range: [" << min << "," << max_finite << "]" << std::endl;
 
