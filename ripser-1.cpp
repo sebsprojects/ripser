@@ -211,6 +211,9 @@ public:
 
 	index_diameter_t next() {
 		j = parent.get_max_vertex(idx_below, k + 1, j);
+		std::cout << "j=" << j << " idx_above=" << idx_above
+		          << " binom=" << parent.binomial_coeff(j, k + 1)
+		          << " idx_below=" << idx_below << std::endl;
 		index_t face_index = idx_above - parent.binomial_coeff(j, k + 1) + idx_below;
 		value_t face_diameter = parent.compute_diameter(face_index, dim - 1);
 		// Update values for next call
@@ -220,6 +223,110 @@ public:
 		return index_diameter_t(face_index, face_diameter);
 	}
 };
+
+class simplex_coboundary_enumerator {
+
+private:
+	const ripser& parent;
+
+	// Simplex to enumerate off given as ((index, diam), dim)
+	mutable index_diameter_t simplex;
+	mutable index_t dim;
+	std::vector<index_t> vertices;
+
+	// Ongoing enumeration
+	mutable index_t idx_below;
+	mutable index_t idx_above;
+	mutable index_t j;
+	mutable index_t k;
+
+public:
+	simplex_coboundary_enumerator(const ripser& _parent) : parent(_parent)
+	{ }
+
+	void set_simplex(const index_diameter_t _simplex, const index_t _dim) {
+		idx_below = get_index(_simplex);
+		idx_above = 0;
+		j = parent.n - 1;
+		k = _dim + 1;
+		simplex = _simplex;
+		vertices.resize(_dim + 1);
+		parent.get_simplex_vertices(get_index(_simplex), _dim, parent.n, vertices);
+	}
+
+	bool has_next(bool all_cofacets = true) {
+		return (j >= k && (all_cofacets || parent.binomial_coeff(j, k) > idx_below));
+	}
+
+	index_diameter_t next() {
+		while (parent.binomial_coeff(j, k) <= idx_below) {
+			idx_below -= parent.binomial_coeff(j, k);
+			idx_above += parent.binomial_coeff(j, k + 1);
+			--j;
+			--k;
+			assert(k != -1);
+		}
+		value_t cofacet_diameter = get_diameter(simplex);
+		for (index_t i : vertices) {
+		  cofacet_diameter = std::max(cofacet_diameter, parent.dist(j, i));
+		}
+		index_t cofacet_index = idx_above + parent.binomial_coeff(j--, k + 1) + idx_below;
+		return index_diameter_t(cofacet_index, cofacet_diameter);
+	}
+};
+
+
+/* **************************************************************************
+ * Debugging and Printing
+ * *************************************************************************/
+
+void print_simplices(ripser& ripser, std::vector<index_diameter_t>& simplices, index_t d) {
+  std::vector<index_t> vertices(ripser.n, -1);
+  for(auto s : simplices) {
+		ripser.get_simplex_vertices(get_index(s), d, ripser.n, vertices);
+		std::cout << "idx=" << get_index(s) << " diam=" << get_diameter(s) << " vs=( ";
+		for(auto i : vertices) {
+			if(i >= 0) {
+			  std::cout << i << " ";
+			}
+		}
+		std::cout << ")" << std::endl;
+		std::fill(vertices.begin(), vertices.end(), -1);
+  }
+}
+
+void list_all_simplices(ripser& ripser) {
+	std::vector<index_diameter_t> simpl_prev;
+	std::vector<index_diameter_t> simpl_curr;
+	for(index_t i = 0; i < ripser.n; i++) {
+		value_t diam = ripser.compute_diameter(i, 0);
+		simpl_prev.push_back(index_diameter_t(i, diam));
+	}
+	print_simplices(ripser, simpl_prev, 0);
+	std::cout << std::endl;
+	
+	simplex_coboundary_enumerator e(ripser);
+	index_t dim = 1;
+	for(auto i : simpl_prev) {
+		e.set_simplex(i, dim - 1);
+		while(e.has_next(false)) {
+		  simpl_curr.push_back(e.next());
+		}
+	}
+	print_simplices(ripser, simpl_curr, dim);
+	std::cout << std::endl;
+	
+	simpl_prev.swap(simpl_curr);
+	simpl_curr.clear();
+	dim = 2;
+	for(auto i : simpl_prev) {
+		e.set_simplex(i, dim - 1);
+		while(e.has_next(false)) {
+		  simpl_curr.push_back(e.next());
+		}
+	}
+	print_simplices(ripser, simpl_curr, dim);
+}
 
 
 /* **************************************************************************
@@ -235,6 +342,7 @@ compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_
 	}
 	return compressed_lower_distance_matrix(std::move(distances));
 }
+
 
 int main(int argc, char** argv) {
 	const char* filename = nullptr;
@@ -284,5 +392,6 @@ int main(int argc, char** argv) {
 
 	// Ripser entry point
 	ripser r(std::move(dist), dim_max, enclosing_radius, ratio);
+	list_all_simplices(r);
 	exit(0);
 }
