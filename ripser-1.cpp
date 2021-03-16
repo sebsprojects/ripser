@@ -38,6 +38,21 @@ value_t get_diameter(const index_diameter_t i) {
 	return i.second;
 }
 
+bool greater_diameter_or_smaller_index(const index_diameter_t& a,
+                                       const index_diameter_t& b) {
+	return (get_diameter(a) > get_diameter(b)) ||
+	       ((get_diameter(a) == get_diameter(b)) &&
+	        (get_index(a) < get_index(b)));
+}
+
+class greater_diameter_or_smaller_index_comp {
+
+public:
+  bool operator()(const index_diameter_t& a, const index_diameter_t& b) {
+	return greater_diameter_or_smaller_index(a, b);
+  }
+};
+
 // Binomial lookup table
 class binomial_coeff_table {
 	std::vector<std::vector<index_t>> B;
@@ -62,7 +77,9 @@ public:
 };
 
 // Type to store the input data as a distance matrix
-struct compressed_lower_distance_matrix {
+class compressed_lower_distance_matrix {
+
+public:
 	std::vector<value_t> distances;
 	std::vector<value_t*> rows;
 
@@ -96,7 +113,30 @@ struct compressed_lower_distance_matrix {
 		}
 	}
 };
-typedef struct compressed_lower_distance_matrix DistanceMatrix ;
+typedef struct compressed_lower_distance_matrix DistanceMatrix;
+
+class compressed_sparse_matrix {
+
+private:
+	std::vector<size_t> bounds;
+	std::vector<index_diameter_t> entries;
+
+public:
+	size_t size() const {
+		return bounds.size();
+	}
+
+	void append_column() {
+		bounds.push_back(entries.size());
+	}
+
+	void push_back(const index_diameter_t idx) {
+		assert(size() >= 0);
+		entries.push_back(idx);
+		++bounds.back();
+	}
+};
+
 
 /* **************************************************************************
  * Ripser
@@ -166,16 +206,12 @@ public:
 		return diam;
 	}
 
-	void assemble_columns_to_reduct(std::vector<index_diameter_t>& simplices,
-	                                std::vector<index_diameter_t>& columns_to_reduce,
-	                                index_t dim) {
-	
-	}
-
-	void compute_barcodes() {
-		std::vector<index_diameter_t> simplices, columns_to_reduce;
-	}
 };
+
+
+/* **************************************************************************
+ * Enumerating simplices
+ * *************************************************************************/
 
 class simplex_boundary_enumerator {
 
@@ -196,6 +232,7 @@ public:
 	simplex_boundary_enumerator(const ripser& _parent) : parent(_parent)
 	{ }
 
+	// _simplex should be a _dim-simplex
 	void set_simplex(const index_diameter_t _simplex, const index_t _dim) {
 		idx_below = get_index(_simplex);
 		idx_above = 0;
@@ -244,6 +281,7 @@ public:
 	simplex_coboundary_enumerator(const ripser& _parent) : parent(_parent)
 	{ }
 
+	// _simplex should be a _dim-simplex
 	void set_simplex(const index_diameter_t _simplex, const index_t _dim) {
 		idx_below = get_index(_simplex);
 		idx_above = 0;
@@ -274,6 +312,106 @@ public:
 		return index_diameter_t(cofacet_index, cofacet_diameter);
 	}
 };
+
+
+/* **************************************************************************
+ * Core Functionality
+ * *************************************************************************/
+
+// Takes a vector of dim-simplices as input and
+// returns the ordered columns of the coboundary matrix
+// Updates simplices to be TODO
+void assemble_coboundaries_to_reduce(ripser &ripser,
+                                     std::vector<index_diameter_t>& simplices,
+                                     std::vector<index_diameter_t>& columns_to_reduce,
+                                     const index_t dim) {
+	columns_to_reduce.clear();
+	std::vector<index_diameter_t> next_simplices;
+	simplex_coboundary_enumerator cofacets(ripser);
+	for(index_diameter_t& simplex : simplices) {
+		cofacets.set_simplex(simplex, dim - 1);
+		while(cofacets.has_next(false)) {
+			//TODO(seb): Check diam <= threshold?
+			index_diameter_t cofacet = cofacets.next();
+			next_simplices.push_back(cofacet);
+			columns_to_reduce.push_back(cofacet);
+		}
+	}
+	simplices.swap(next_simplices);
+	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
+              greater_diameter_or_smaller_index);
+}
+
+// A working column is represented by this type. The entries are ordered with
+// respect to reverse filtration order
+typedef std::priority_queue<index_diameter_t,
+                            std::vector<index_diameter_t>,
+                            greater_diameter_or_smaller_index_comp> Column;
+
+// If the same row index appears twice, they sum up to 0 (in F2) and we continue
+index_diameter_t pop_pivot(Column& column) {
+	index_diameter_t pivot(-1, -1);
+	while(!column.empty()) {
+		pivot = column.top();
+		column.pop();
+		if(column.empty()) {
+			return pivot;
+		}
+		if(get_index(column.top()) != get_index(pivot)) { // different index on top
+			return pivot;
+		} else { // same index on top
+		  column.pop();
+		}
+	}
+	return index_diameter_t(-1, -1);
+}
+
+// Note: May reduce to size of column by popping 'canceling' pivots but only
+// replacing one
+index_diameter_t get_pivot(Column& column) {
+	index_diameter_t pivot = pop_pivot(column);
+	if(get_index(pivot) != -1) {
+		column.push(pivot); // push back the popped pivot
+	}
+	return pivot;
+}
+
+index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
+                                               const index_diameter_t simplex,
+                                               const index_t dim,
+                                               Column working_coboundary) {
+	simplex_coboundary_enumerator cofacets(ripser);
+	std::vector<index_diameter_t> cofacet_entries;
+	cofacets.set_simplex(simplex, dim);
+	while(cofacets.has_next()) {
+		index_diameter_t cofacet = cofacets.next();
+		//TODO(seb): Check diam <= threshold
+		//cofacet_entries.push_back(cofacet);
+	//}
+	//for(index_diameter_t cofacet : cofacet_entries) {
+		working_coboundary.push(cofacet);
+	}
+	return get_pivot(working_coboundary);
+}
+
+
+void add_coboundary(compressed_sparse_matrix& reduction_matrix,
+                    const std::vector<index_diameter_t>& columns_to_reduce,
+                    const size_t index_column_to_add,
+                    const size_t dim) {
+}
+
+void compute_pairs(ripser &ripser,
+                   const std::vector<index_diameter_t>& columns_to_reduce,
+                   // pivots,
+                   const index_t dim) {
+
+}
+
+void compute_barcodes() {
+	std::vector<index_diameter_t> simplices;
+	std::vector<index_diameter_t> columns_to_reduce;
+}
 
 
 /* **************************************************************************

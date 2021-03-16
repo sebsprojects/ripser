@@ -57,10 +57,6 @@ typedef float value_t;
 typedef int64_t index_t;
 typedef uint16_t coefficient_t;
 
-#ifdef INDICATE_PROGRESS
-static const std::chrono::milliseconds time_step(40);
-#endif
-
 static const std::string clear_line("\r\033[K");
 
 static const size_t num_coefficient_bits = 8;
@@ -496,11 +492,6 @@ public:
 	                                std::vector<diameter_index_t>& columns_to_reduce,
 	                                entry_hash_map& pivot_column_index, index_t dim) {
 
-#ifdef INDICATE_PROGRESS
-		std::cerr << clear_line << "assembling columns" << std::flush;
-		std::chrono::steady_clock::time_point next = std::chrono::steady_clock::now() + time_step;
-#endif
-
 		columns_to_reduce.clear();
 		std::vector<diameter_index_t> next_simplices;
 
@@ -510,14 +501,6 @@ public:
 			cofacets.set_simplex(diameter_entry_t(simplex, 1), dim - 1);
 
 			while (cofacets.has_next(false)) {
-#ifdef INDICATE_PROGRESS
-				if (std::chrono::steady_clock::now() > next) {
-					std::cerr << clear_line << "assembling " << next_simplices.size()
-					          << " columns (processing " << std::distance(&simplices[0], &simplex)
-					          << "/" << simplices.size() << " simplices)" << std::flush;
-					next = std::chrono::steady_clock::now() + time_step;
-				}
-#endif
 				auto cofacet = cofacets.next();
 				if (get_diameter(cofacet) <= threshold) {
 					next_simplices.push_back({get_diameter(cofacet), get_index(cofacet)});
@@ -530,16 +513,8 @@ public:
 
 		simplices.swap(next_simplices);
 
-#ifdef INDICATE_PROGRESS
-		std::cerr << clear_line << "sorting " << columns_to_reduce.size() << " columns"
-		          << std::flush;
-#endif
-
 		std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
 		          greater_diameter_or_smaller_index<diameter_index_t>);
-#ifdef INDICATE_PROGRESS
-		std::cerr << clear_line << std::flush;
-#endif
 	}
 
 	void compute_dim_0_pairs(std::vector<diameter_index_t>& edges,
@@ -592,6 +567,7 @@ public:
 		return result;
 	}
 
+	//TODO(seb) why is dim passed by reference?
 	template <typename Column>
 	diameter_entry_t init_coboundary_and_get_pivot(const diameter_entry_t simplex,
 	                                               Column& working_coboundary, const index_t& dim,
@@ -612,6 +588,7 @@ public:
 				}
 			}
 		}
+		// TODO(seb) replace auto
 		for (auto cofacet : cofacet_entries) working_coboundary.push(cofacet);
 		return get_pivot(working_coboundary);
 	}
@@ -643,6 +620,7 @@ public:
 		}
 	}
 
+	//TODO(seb) const dim vs assemble_cols non-const
 	void compute_pairs(const std::vector<diameter_index_t>& columns_to_reduce,
 	                   entry_hash_map& pivot_column_index, const index_t dim) {
 
@@ -652,9 +630,6 @@ public:
 
 		compressed_sparse_matrix<diameter_entry_t> reduction_matrix;
 		
-#ifdef INDICATE_PROGRESS
-		std::chrono::steady_clock::time_point next = std::chrono::steady_clock::now() + time_step;
-#endif
 		for (size_t index_column_to_reduce = 0; index_column_to_reduce < columns_to_reduce.size();
 		     ++index_column_to_reduce) {
 
@@ -671,14 +646,6 @@ public:
 			                        column_to_reduce, working_coboundary, dim, pivot_column_index);
 
 			while (true) {
-#ifdef INDICATE_PROGRESS
-				if (std::chrono::steady_clock::now() > next) {
-					std::cerr << clear_line << "reducing column " << index_column_to_reduce + 1
-					          << "/" << columns_to_reduce.size() << " (diameter " << diameter << ")"
-					          << std::flush;
-					next = std::chrono::steady_clock::now() + time_step;
-				}
-#endif
 				if (get_index(pivot) != -1) {
 					auto pair = pivot_column_index.find(get_entry(pivot));
 					if (pair != pivot_column_index.end()) {
@@ -703,9 +670,6 @@ public:
 #ifdef PRINT_PERSISTENCE_PAIRS
 						value_t death = get_diameter(pivot);
 						if (death > diameter * ratio) {
-#ifdef INDICATE_PROGRESS
-							std::cerr << clear_line << std::flush;
-#endif
 							std::cout << " [" << diameter << "," << death << ")" << std::endl;
 						}
 #endif
@@ -721,18 +685,12 @@ public:
 					}
 				} else {
 #ifdef PRINT_PERSISTENCE_PAIRS
-#ifdef INDICATE_PROGRESS
-					std::cerr << clear_line << std::flush;
-#endif
 					std::cout << " [" << diameter << ", )" << std::endl;
 #endif
 					break;
 				}
 			}
 		}
-#ifdef INDICATE_PROGRESS
-		std::cerr << clear_line << std::flush;
-#endif
 	}
 
 	std::vector<diameter_index_t> get_edges();
