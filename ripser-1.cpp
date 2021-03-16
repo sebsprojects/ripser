@@ -53,6 +53,12 @@ public:
   }
 };
 
+// A working column is represented by this type. The entries are ordered with
+// respect to reverse filtration order
+typedef std::priority_queue<index_diameter_t,
+                            std::vector<index_diameter_t>,
+                            greater_diameter_or_smaller_index_comp> Column;
+
 // Binomial lookup table
 class binomial_coeff_table {
 	std::vector<std::vector<index_t>> B;
@@ -304,6 +310,7 @@ public:
 			--k;
 			assert(k != -1);
 		}
+		//TODO(seb): Do we really need the diameter of simplex in this enumerator?
 		value_t cofacet_diameter = get_diameter(simplex);
 		for (index_t i : vertices) {
 		  cofacet_diameter = std::max(cofacet_diameter, parent.dist(j, i));
@@ -315,38 +322,8 @@ public:
 
 
 /* **************************************************************************
- * Core Functionality
+ * Matrix Reduction Operations
  * *************************************************************************/
-
-// Takes a vector of dim-simplices as input and
-// returns the ordered columns of the coboundary matrix
-// Updates simplices to be TODO
-void assemble_coboundaries_to_reduce(ripser &ripser,
-                                     std::vector<index_diameter_t>& simplices,
-                                     std::vector<index_diameter_t>& columns_to_reduce,
-                                     const index_t dim) {
-	columns_to_reduce.clear();
-	std::vector<index_diameter_t> next_simplices;
-	simplex_coboundary_enumerator cofacets(ripser);
-	for(index_diameter_t& simplex : simplices) {
-		cofacets.set_simplex(simplex, dim - 1);
-		while(cofacets.has_next(false)) {
-			//TODO(seb): Check diam <= threshold?
-			index_diameter_t cofacet = cofacets.next();
-			next_simplices.push_back(cofacet);
-			columns_to_reduce.push_back(cofacet);
-		}
-	}
-	simplices.swap(next_simplices);
-	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
-              greater_diameter_or_smaller_index);
-}
-
-// A working column is represented by this type. The entries are ordered with
-// respect to reverse filtration order
-typedef std::priority_queue<index_diameter_t,
-                            std::vector<index_diameter_t>,
-                            greater_diameter_or_smaller_index_comp> Column;
 
 // If the same row index appears twice, they sum up to 0 (in F2) and we continue
 index_diameter_t pop_pivot(Column& column) {
@@ -394,16 +371,70 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 	return get_pivot(working_coboundary);
 }
 
+void add_simplex_coboundary(ripser& ripser,
+                            const index_diameter_t simplex,
+                            const index_t dim,
+                            Column& working_reduction_column,
+                            Column& working_coboundary) {
+	simplex_coboundary_enumerator cofacets(ripser);
+	working_reduction_column.push(simplex);
+	cofacets.set_simplex(simplex, dim);
+	while(cofacets.has_next()) {
+		index_diameter_t cofacet = cofacets.next();
+		//TODO(seb): Check diam <= threshold
+		working_coboundary.push(cofacet);
+	}
+}
 
-void add_coboundary(compressed_sparse_matrix& reduction_matrix,
+// TODO(seb): param order should be uniform
+void add_coboundary(ripser& ripser,
+                    compressed_sparse_matrix& reduction_matrix,
+                    Column& working_reduction_column,
+                    Column& working_coboundary,
                     const std::vector<index_diameter_t>& columns_to_reduce,
                     const size_t index_column_to_add,
                     const size_t dim) {
+	//TODO(seb): Do we need the correct diameter here?
+	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add), -1);
+	add_simplex_coboundary(ripser, column_to_add, dim, working_reduction_column,
+	                       working_coboundary);
+	for(index_diameter_t simplex : reduction_matrix.subrange()) {
+		add_simplex_coboundary(ripser, simplex, dim, working_reduction_column,
+                               working_coboundary);
+	}
+}
+
+
+/* **************************************************************************
+ * Core Functionality
+ * *************************************************************************/
+
+// Takes a vector of dim-simplices as input and
+// returns the ordered columns of the coboundary matrix
+// Updates simplices to be TODO
+void assemble_coboundaries_to_reduce(ripser &ripser,
+                                     std::vector<index_diameter_t>& simplices,
+                                     std::vector<index_diameter_t>& columns_to_reduce,
+                                     const index_t dim) {
+	columns_to_reduce.clear();
+	std::vector<index_diameter_t> next_simplices;
+	simplex_coboundary_enumerator cofacets(ripser);
+	for(index_diameter_t& simplex : simplices) {
+		cofacets.set_simplex(simplex, dim - 1);
+		while(cofacets.has_next(false)) {
+			//TODO(seb): Check diam <= threshold?
+			index_diameter_t cofacet = cofacets.next();
+			next_simplices.push_back(cofacet);
+			columns_to_reduce.push_back(cofacet);
+		}
+	}
+	simplices.swap(next_simplices);
+	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
+              greater_diameter_or_smaller_index);
 }
 
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
-                   // pivots,
                    const index_t dim) {
 
 }
