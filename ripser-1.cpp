@@ -14,8 +14,8 @@
  * Types and Utility
  * *************************************************************************/
 
-typedef float value_t;
 typedef int64_t index_t;
+typedef float value_t;
 
 const value_t INF = std::numeric_limits<value_t>::infinity();
 
@@ -124,10 +124,40 @@ typedef struct compressed_lower_distance_matrix DistanceMatrix;
 class compressed_sparse_matrix {
 
 private:
+public:
 	std::vector<size_t> bounds;
 	std::vector<index_diameter_t> entries;
 
-public:
+	compressed_sparse_matrix() {}
+
+	size_t column_start(const index_t index) const {
+		return index == 0 ? 0 : bounds.at(index - 1);
+	}
+
+	size_t column_end(const index_t index) const {
+		return bounds.at(index);
+	}
+
+	index_diameter_t get_entry(const size_t index) {
+		return entries.at(index);
+	}
+
+	index_diameter_t get_entry(const size_t row_index, const size_t col_index) {
+		return entries.at(column_start(col_index) + row_index);
+	}
+
+	bool has_entry_at(const size_t row_index, const size_t col_index) {
+		if(bounds.size() <= col_index) {
+			return false;
+		}
+		for(size_t i = column_start(col_index); i < column_end(col_index); ++i) {
+			if(get_index(entries.at(i)) == row_index) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	size_t size() const {
 		return bounds.size();
 	}
@@ -142,6 +172,20 @@ public:
 		++bounds.back();
 	}
 };
+
+struct index_hash {
+	size_t operator()(const index_t& e) const {
+		return std::hash<index_t>()(e);
+	}
+};
+
+struct equal_index {
+	bool operator()(const index_t& e, const index_t& f) const {
+		return e == f;
+	}
+};
+
+typedef std::unordered_map<index_t, size_t, index_hash, equal_index> entry_hash_map;
 
 
 /* **************************************************************************
@@ -325,7 +369,9 @@ public:
  * Matrix Reduction Operations
  * *************************************************************************/
 
-// If the same row index appears twice, they sum up to 0 (in F2) and we continue
+// Take a column (formal sum of simplices) and return the pivot element,
+// i.e. the largest simplex that does not cancel out
+// If and only if the column is zero, return (-1, -1)
 index_diameter_t pop_pivot(Column& column) {
 	index_diameter_t pivot(-1, -1);
 	while(!column.empty()) {
@@ -337,6 +383,7 @@ index_diameter_t pop_pivot(Column& column) {
 		if(get_index(column.top()) != get_index(pivot)) { // different index on top
 			return pivot;
 		} else { // same index on top
+		  // The same row index appears twice, they sum up to 0 (in F2), continue
 		  column.pop();
 		}
 	}
@@ -353,12 +400,14 @@ index_diameter_t get_pivot(Column& column) {
 	return pivot;
 }
 
+// Take a dim-simplex as input and assemble to coboundary matrix column
+// corresponding to that simplex. Return the pivot element of that column
 index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
                                                const index_diameter_t simplex,
                                                const index_t dim,
-                                               Column working_coboundary) {
+                                               Column& working_coboundary) {
 	simplex_coboundary_enumerator cofacets(ripser);
-	std::vector<index_diameter_t> cofacet_entries;
+	// std::vector<index_diameter_t> cofacet_entries;
 	cofacets.set_simplex(simplex, dim);
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
@@ -371,6 +420,8 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 	return get_pivot(working_coboundary);
 }
 
+// Add the coboundary column of simplex to the coboundary column working_coboundary
+// Add simplex to the working_reduction_column (matrix V)
 void add_simplex_coboundary(ripser& ripser,
                             const index_diameter_t simplex,
                             const index_t dim,
@@ -386,21 +437,31 @@ void add_simplex_coboundary(ripser& ripser,
 	}
 }
 
-// TODO(seb): param order should be uniform
+// 
 void add_coboundary(ripser& ripser,
                     compressed_sparse_matrix& reduction_matrix,
-                    Column& working_reduction_column,
-                    Column& working_coboundary,
                     const std::vector<index_diameter_t>& columns_to_reduce,
                     const size_t index_column_to_add,
-                    const size_t dim) {
+                    const size_t dim,
+                    Column& working_reduction_column,
+                    Column& working_coboundary) {
 	//TODO(seb): Do we need the correct diameter here?
-	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add), -1);
-	add_simplex_coboundary(ripser, column_to_add, dim, working_reduction_column,
+	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add));
+	add_simplex_coboundary(ripser,
+	                       column_to_add,
+	                       dim,
+	                       working_reduction_column,
 	                       working_coboundary);
-	for(index_diameter_t simplex : reduction_matrix.subrange()) {
-		add_simplex_coboundary(ripser, simplex, dim, working_reduction_column,
-                               working_coboundary);
+	// Computation of R_j due to implicit reduction
+	for(size_t i = reduction_matrix.column_start(index_column_to_add);
+	    i < reduction_matrix.column_end(index_column_to_add);
+	    ++i) {
+		index_diameter_t simplex = reduction_matrix.get_entry(i);
+		add_simplex_coboundary(ripser,
+		                       simplex,
+		                       dim,
+		                       working_reduction_column,
+		                       working_coboundary);
 	}
 }
 
@@ -409,9 +470,10 @@ void add_coboundary(ripser& ripser,
  * Core Functionality
  * *************************************************************************/
 
-// Takes a vector of dim-simplices as input and
-// returns the ordered columns of the coboundary matrix
-// Updates simplices to be TODO
+// Takes a vector of (dim-1)-simplices as input and sets columns_to_reduce
+// to contain all cofacets of those simplices
+// ordered column indices (indexed by dim-simplices) of the coboundary matrix
+// Sets simplices to contain all dim-simplices
 void assemble_coboundaries_to_reduce(ripser &ripser,
                                      std::vector<index_diameter_t>& simplices,
                                      std::vector<index_diameter_t>& columns_to_reduce,
@@ -433,15 +495,82 @@ void assemble_coboundaries_to_reduce(ripser &ripser,
               greater_diameter_or_smaller_index);
 }
 
+void print_column(ripser& ripser, Column &column, index_t dim);
+void print_simplex(ripser& ripser, index_t simplex, index_t dim);
+void print_simplices(ripser& ripser, std::vector<index_diameter_t>& simplices, index_t d);
+void print_v(compressed_sparse_matrix& mat,
+             std::vector<index_diameter_t> columns_to_reduce);
+void print_mat(compressed_sparse_matrix& mat);
+
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
+                   entry_hash_map& pivot_column_index,
                    const index_t dim) {
-
+	compressed_sparse_matrix reduction_matrix; // V
+	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+		reduction_matrix.append_column();
+		Column working_reduction_column; // V_j
+		Column working_coboundary;       // R_j
+		// Assemble the column j (corresponding to the simplex column_to_reduce)
+		// and get the pivot of that column
+		index_diameter_t column_to_reduce = columns_to_reduce.at(j);
+		index_diameter_t pivot = init_coboundary_and_get_pivot(ripser,
+		                                                       column_to_reduce,
+		                                                       dim,
+		                                                       working_coboundary);
+		value_t diameter = get_diameter(column_to_reduce);
+		//print_column(ripser, working_coboundary, dim + 1);
+		//print_simplex(ripser, pivot.first, dim + 1);
+		// The reduction
+		while(get_index(pivot) != -1) {
+			auto pair = pivot_column_index.find(get_index(pivot));
+			if(pair != pivot_column_index.end()) {
+				size_t index_column_to_add = pair->second;
+				add_coboundary(ripser,
+				               reduction_matrix,
+				               columns_to_reduce,
+				               index_column_to_add,
+				               dim,
+				               working_reduction_column,
+				               working_coboundary);
+				pivot = get_pivot(working_coboundary);
+			} else {
+				pivot_column_index.insert({get_index(pivot), j});
+				break;
+			}
+		}
+		// Write V_j to V
+		index_diameter_t e = pop_pivot(working_reduction_column);
+		while(get_index(e) != -1) {
+			reduction_matrix.push_back(e);
+			e = pop_pivot(working_reduction_column);
+		}
+		//print_mat(reduction_matrix);
+		print_v(reduction_matrix, columns_to_reduce);
+		std::cout << "-------------------------------------" << std::endl;
+	}
 }
 
-void compute_barcodes() {
+void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
+	for(index_t i = 0; i < ripser.n; i++) {
+		value_t diam = ripser.compute_diameter(i, 0);
+		simplices.push_back(index_diameter_t(i, diam));
+	}
+	index_t dim = 1;
 	std::vector<index_diameter_t> columns_to_reduce;
+	entry_hash_map pivot_column_index;
+	pivot_column_index.reserve(columns_to_reduce.size());
+	if(dim > 0) {
+	  assemble_coboundaries_to_reduce(ripser, simplices, columns_to_reduce, dim);
+	} else {
+		columns_to_reduce = std::vector<index_diameter_t>(simplices);
+	}
+	for(auto s : columns_to_reduce) {
+		std::cout << get_index(s) << " ";
+	}
+	std::cout << std::endl;
+	compute_pairs(ripser, columns_to_reduce, pivot_column_index, dim);
 }
 
 
@@ -453,10 +582,10 @@ void print_simplices(ripser& ripser, std::vector<index_diameter_t>& simplices, i
   std::vector<index_t> vertices(ripser.n, -1);
   for(auto s : simplices) {
 		ripser.get_simplex_vertices(get_index(s), d, ripser.n, vertices);
-		std::cout << "idx=" << get_index(s) << " diam=" << get_diameter(s) << " vs=( ";
+		std::cout << "    (" << get_index(s) << " :: "<< get_diameter(s) << " :: ";
 		for(auto i : vertices) {
 			if(i >= 0) {
-			  std::cout << i << " ";
+			  std::cout << i << "'";
 			}
 		}
 		std::cout << ")" << std::endl;
@@ -465,14 +594,15 @@ void print_simplices(ripser& ripser, std::vector<index_diameter_t>& simplices, i
 }
 
 void list_all_simplices(ripser& ripser) {
+	std::cout << "info: list of all simplices (id :: diam :: vertices)" << std::endl;
 	std::vector<index_diameter_t> simpl_prev;
 	std::vector<index_diameter_t> simpl_curr;
 	for(index_t i = 0; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simpl_prev.push_back(index_diameter_t(i, diam));
 	}
+	std::cout << "  dim 0" << std::endl;
 	print_simplices(ripser, simpl_prev, 0);
-	std::cout << std::endl;
 	
 	simplex_coboundary_enumerator e(ripser);
 	index_t dim = 1;
@@ -482,8 +612,8 @@ void list_all_simplices(ripser& ripser) {
 		  simpl_curr.push_back(e.next());
 		}
 	}
+	std::cout << "  dim 1:" << std::endl;
 	print_simplices(ripser, simpl_curr, dim);
-	std::cout << std::endl;
 	
 	simpl_prev.swap(simpl_curr);
 	simpl_curr.clear();
@@ -494,7 +624,109 @@ void list_all_simplices(ripser& ripser) {
 		  simpl_curr.push_back(e.next());
 		}
 	}
+	std::cout << "  dim 2:" << std::endl;
 	print_simplices(ripser, simpl_curr, dim);
+}
+
+int sprint_element(char* buf, index_t el, int pad) {
+	char format[16]; format[0] = '\0';
+	sprintf(format, "%s%i%s ", "%", pad, "i");
+	return sprintf(buf, format, el);
+}
+
+int sprint_pad(char *buf, int pad) {
+	return sprintf(buf, "%*s. ", pad - 1, "");
+}
+
+int sprint_simplex(char *buf, ripser& ripser, index_t simplex, index_t dim) {
+	std::vector<index_t> vertices(ripser.n, -1);
+	ripser.get_simplex_vertices(simplex, dim, ripser.n, vertices);
+	int offs = 0;
+	offs += sprintf(offs + buf, "%i-", simplex);
+	for(auto v : vertices) {
+	  if(v == -1) continue;
+	  offs += sprintf(offs + buf, "%i'", v);
+	}
+	return offs;
+}
+
+void print_simplex(ripser& ripser, index_t simplex, index_t dim) {
+	char buf[1024]; buf[0] ='\0';
+	sprint_simplex(buf, ripser, simplex, dim);
+	printf("%s\n", buf);
+}
+
+void print_column(ripser& ripser, Column &column, index_t dim) {
+	Column col(column); // copy
+	char buf[1024]; buf[0] = '\0';
+	int offs = 0;
+	while(!col.empty()) {
+		index_diameter_t simp = col.top();
+		col.pop();
+		offs += sprint_simplex(buf + offs, ripser, get_index(simp), dim);
+		offs += sprintf(buf + offs, " ");
+	}
+	printf("%s\n", buf);
+}
+
+void print_v(compressed_sparse_matrix& v,
+             std::vector<index_diameter_t> columns_to_reduce) {
+	char buf[1024]; buf[0] = '\0';
+	int offs = 0;
+	int pad = 3;
+	for(size_t row = 0; row < columns_to_reduce.size(); ++row) {
+		index_t row_ele = get_index(columns_to_reduce.at(row));
+		for(size_t col = 0; col < columns_to_reduce.size(); ++col) {
+			if(col >= v.size()) {
+				offs += sprint_pad(buf + offs, pad);
+			} else {
+				size_t count = 0;
+				for(size_t i = v.column_start(col); i < v.column_end(col); ++i) {
+					if(get_index(v.get_entry(i)) == row_ele) {
+						count++;
+					}
+				}
+				if(count % 2 == 1) {
+					offs += sprint_element(buf + offs, 1, pad);
+				} else {
+					offs += sprint_pad(buf + offs, pad);
+				}
+			}
+		}
+		offs += sprintf(offs + buf, "\n");
+	}
+	printf("%s", buf);
+}
+
+void print_mat(compressed_sparse_matrix& mat) {
+	char buf[1024]; buf[0] = '\0';
+	int offs = 0;
+	int pad = 3;
+	size_t max_row_index = 0;
+	for(size_t i = 0; i < mat.size(); ++i) {
+		max_row_index = std::max(max_row_index,
+		                         mat.column_end(i) - mat.column_start(i));
+	}
+//	for(auto e : mat.bounds) {
+//		std::cout << e;
+//	}
+//	std::cout << std::endl;
+//	for(auto e : mat.entries) {
+//		std::cout << get_index(e) << " ";
+//	}
+	std::cout << std::endl;
+	for(size_t row = 0; row < max_row_index; ++row) {
+		for(size_t col = 0; col < mat.size(); ++col) {
+			if(row < mat.column_end(col) - mat.column_start(col)) {
+				index_t ele = get_index(mat.get_entry(row, col));
+				offs += sprint_element(offs + buf, ele, pad);
+			} else {
+				offs += sprint_pad(offs + buf, pad);
+			}
+		}
+		offs += sprintf(offs + buf, "\n");
+	}
+	printf("%s", buf);
 }
 
 
@@ -512,6 +744,20 @@ compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_
 	return compressed_lower_distance_matrix(std::move(distances));
 }
 
+void test_compressed_sparse_matrix_print() {
+	compressed_sparse_matrix m;
+	m.append_column();
+	m.push_back(index_diameter_t(0, 0));
+	m.push_back(index_diameter_t(1, 0));
+	m.append_column();
+	m.push_back(index_diameter_t(2, 0));
+	m.push_back(index_diameter_t(3, 0));
+	m.push_back(index_diameter_t(4, 0));
+	m.append_column();
+	m.push_back(index_diameter_t(5, 0));
+	m.append_column();
+	//print_matrix(m);
+}
 
 int main(int argc, char** argv) {
 	const char* filename = nullptr;
@@ -553,14 +799,15 @@ int main(int argc, char** argv) {
 		max = std::max(max, d);
 		if (d != INF) max_finite = std::max(max_finite, d);
 	}
-	std::cout << "value range: [" << min << "," << max_finite << "]" << std::endl;
+	std::cout << "info: value range: [" << min << "," << max_finite << "]" << std::endl;
 
-	std::cout << "distance matrix with " << dist.size()
+	std::cout << "info: distance matrix with " << dist.size()
 			  << " points, using threshold at enclosing radius " << enclosing_radius
 			  << std::endl;
-
-	// Ripser entry point
-	ripser r(std::move(dist), dim_max, enclosing_radius, ratio);
-	list_all_simplices(r);
+	
+	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
+	list_all_simplices(ripser);
+	
+	compute_barcodes(ripser);
 	exit(0);
 }

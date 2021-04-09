@@ -19,5 +19,8 @@ ripser-bare: ripser-bare.cpp
 ripser-1: ripser-1.cpp
 	c++ -std=c++11 -Wall ripser-1.cpp -o ripser-1 -g
 
+ripser-t1: ripser-t1.cpp
+	c++ -std=c++11 -Wall ripser-t1.cpp -o ripser-t1 -g
+
 clean:
-	rm -f ripser ripser-coeff ripser-debug ripser-bare ripser-1
+	rm -f ripser ripser-coeff ripser-debug ripser-bare ripser-1 ripser-t1

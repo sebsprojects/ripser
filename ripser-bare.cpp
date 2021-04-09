@@ -567,7 +567,7 @@ public:
 		return result;
 	}
 
-	//TODO(seb) why is dim passed by reference?
+	//TODO(seb) why passed by reference?
 	template <typename Column>
 	diameter_entry_t init_coboundary_and_get_pivot(const diameter_entry_t simplex,
 	                                               Column& working_coboundary, const index_t& dim,
