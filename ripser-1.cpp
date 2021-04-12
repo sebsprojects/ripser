@@ -474,10 +474,10 @@ void add_coboundary(ripser& ripser,
 // to contain all cofacets of those simplices
 // ordered column indices (indexed by dim-simplices) of the coboundary matrix
 // Sets simplices to contain all dim-simplices
-void assemble_coboundaries_to_reduce(ripser &ripser,
-                                     std::vector<index_diameter_t>& simplices,
-                                     std::vector<index_diameter_t>& columns_to_reduce,
-                                     const index_t dim) {
+void assemble_columns_to_reduce(ripser &ripser,
+                                std::vector<index_diameter_t>& simplices,
+                                std::vector<index_diameter_t>& columns_to_reduce,
+                                const index_t dim) {
 	columns_to_reduce.clear();
 	std::vector<index_diameter_t> next_simplices;
 	simplex_coboundary_enumerator cofacets(ripser);
@@ -486,8 +486,10 @@ void assemble_coboundaries_to_reduce(ripser &ripser,
 		while(cofacets.has_next(false)) {
 			//TODO(seb): Check diam <= threshold?
 			index_diameter_t cofacet = cofacets.next();
-			next_simplices.push_back(cofacet);
-			columns_to_reduce.push_back(cofacet);
+			if(get_diameter(cofacet) <= ripser.threshold) {
+				next_simplices.push_back(cofacet);
+				columns_to_reduce.push_back(cofacet);
+			}
 		}
 	}
 	simplices.swap(next_simplices);
@@ -506,7 +508,9 @@ void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
                    const index_t dim) {
+	std::cout << "persistence intervals in dim " << dim << ":" << std::endl;
 	compressed_sparse_matrix reduction_matrix; // V
+	std::cout << "Num of col to red: " << columns_to_reduce.size() << std::endl;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		reduction_matrix.append_column();
 		Column working_reduction_column; // V_j
@@ -518,36 +522,50 @@ void compute_pairs(ripser &ripser,
 		                                                       column_to_reduce,
 		                                                       dim,
 		                                                       working_coboundary);
-		value_t diameter = get_diameter(column_to_reduce);
-		//print_column(ripser, working_coboundary, dim + 1);
-		//print_simplex(ripser, pivot.first, dim + 1);
+		value_t birth = get_diameter(column_to_reduce);
+		if(dim == 0 && birth == -INF) {
+			birth = 0;
+		}
+		//print_column(ripser, working_coboundary, dim);
 		// The reduction
-		while(get_index(pivot) != -1) {
-			auto pair = pivot_column_index.find(get_index(pivot));
-			if(pair != pivot_column_index.end()) {
-				size_t index_column_to_add = pair->second;
-				add_coboundary(ripser,
-				               reduction_matrix,
-				               columns_to_reduce,
-				               index_column_to_add,
-				               dim,
-				               working_reduction_column,
-				               working_coboundary);
-				pivot = get_pivot(working_coboundary);
+		while(true) {
+			// Check if the column is not (did not get reduced to) a 0-column
+			if(get_index(pivot) != -1) {
+				auto pair = pivot_column_index.find(get_index(pivot));
+				// Check ?
+				if(pair != pivot_column_index.end()) {
+					size_t index_column_to_add = pair->second;
+					add_coboundary(ripser,
+					               reduction_matrix,
+					               columns_to_reduce,
+					               index_column_to_add,
+					               dim,
+					               working_reduction_column,
+					               working_coboundary);
+					pivot = get_pivot(working_coboundary);
+				} else {
+					value_t death = get_diameter(pivot);
+					if(death > birth * ripser.ratio) {
+						std::cout << " [" << birth << "," << death << ")" << std::endl;
+					}
+					pivot_column_index.insert({get_index(pivot), j});
+					// Write V_j to V
+					index_diameter_t e = pop_pivot(working_reduction_column);
+					while(get_index(e) != -1) {
+						reduction_matrix.push_back(e);
+						e = pop_pivot(working_reduction_column);
+					}
+					break;
+				}
 			} else {
-				pivot_column_index.insert({get_index(pivot), j});
+				// Zero column, persistent homology "pair"
+				std::cout << " [" << birth << ", )" << std::endl;
 				break;
 			}
 		}
-		// Write V_j to V
-		index_diameter_t e = pop_pivot(working_reduction_column);
-		while(get_index(e) != -1) {
-			reduction_matrix.push_back(e);
-			e = pop_pivot(working_reduction_column);
-		}
 		//print_mat(reduction_matrix);
-		print_v(reduction_matrix, columns_to_reduce);
-		std::cout << "-------------------------------------" << std::endl;
+		//print_v(reduction_matrix, columns_to_reduce);
+		//std::cout << "-------------------------------------" << std::endl;
 	}
 }
 
@@ -557,20 +575,23 @@ void compute_barcodes(ripser& ripser) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
 	}
-	index_t dim = 1;
-	std::vector<index_diameter_t> columns_to_reduce;
-	entry_hash_map pivot_column_index;
-	pivot_column_index.reserve(columns_to_reduce.size());
-	if(dim > 0) {
-	  assemble_coboundaries_to_reduce(ripser, simplices, columns_to_reduce, dim);
-	} else {
-		columns_to_reduce = std::vector<index_diameter_t>(simplices);
+	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
+		std::vector<index_diameter_t> columns_to_reduce;
+		entry_hash_map pivot_column_index;
+		pivot_column_index.reserve(columns_to_reduce.size());
+		if(dim == 0) {
+			columns_to_reduce = std::vector<index_diameter_t>(simplices);
+		} else {
+			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
+		}
+		//std::vector<index_diameter_t> ctr;
+		//for(auto c : columns_to_reduce) {
+		//	if(get_index(c) == 1 || get_index(c) == 4 || get_index(c) == 0) {
+		//		ctr.push_back(c);
+		//	}
+		//}
+		compute_pairs(ripser, columns_to_reduce, pivot_column_index, dim);
 	}
-	for(auto s : columns_to_reduce) {
-		std::cout << get_index(s) << " ";
-	}
-	std::cout << std::endl;
-	compute_pairs(ripser, columns_to_reduce, pivot_column_index, dim);
 }
 
 
