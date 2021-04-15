@@ -45,17 +45,33 @@ value_t get_diameter(const index_diameter_t i) {
  * Binomial Numbering System and Ordering
  * *************************************************************************/
 
-bool greater_diameter_or_smaller_index(const index_diameter_t& a,
-                                       const index_diameter_t& b) {
+// a < b iff diam(a) < diam(b), if equal index(a) > index(b)
+bool filtration_order(const index_diameter_t& a,
+                      const index_diameter_t& b) {
+	return (get_diameter(a) < get_diameter(b)) ||
+	        ((get_diameter(a) == get_diameter(b)) &&
+	         (get_index(a) > get_index(b)));
+}
+
+struct filtration_order_comp {
+  bool operator()(const index_diameter_t& a, const index_diameter_t& b) {
+	return filtration_order(a, b);
+  }
+};
+
+// TODO(seb): Should be equivalent to filtration_order(b, a)
+
+// a < b iff diam(a) > diam(b), if equal index(a) < index(b)
+bool reverse_filtration_order(const index_diameter_t& a,
+                              const index_diameter_t& b) {
 	return (get_diameter(a) > get_diameter(b)) ||
 	       ((get_diameter(a) == get_diameter(b)) &&
 	        (get_index(a) < get_index(b)));
 }
 
-struct greater_diameter_or_smaller_index_comp {
-
+struct reverse_filtration_order_comp {
   bool operator()(const index_diameter_t& a, const index_diameter_t& b) {
-	return greater_diameter_or_smaller_index(a, b);
+	return reverse_filtration_order(a, b);
   }
 };
 
@@ -189,11 +205,6 @@ compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_
  * Types for Reduction Algorithm
  * *************************************************************************/
 
-// A working column is represented by this type. The entries are ordered with
-// respect to reverse filtration order
-typedef std::priority_queue<index_diameter_t,
-                            std::vector<index_diameter_t>,
-                            greater_diameter_or_smaller_index_comp> Column;
 
 struct index_hash {
 	size_t operator()(const index_t& e) const {
@@ -318,9 +329,9 @@ public:
 
 	index_diameter_t next() {
 		j = parent.get_max_vertex(idx_below, k + 1, j);
-		std::cout << "j=" << j << " idx_above=" << idx_above
-		          << " binom=" << parent.binomial_coeff(j, k + 1)
-		          << " idx_below=" << idx_below << std::endl;
+		//std::cout << "j=" << j << " idx_above=" << idx_above
+		//          << " binom=" << parent.binomial_coeff(j, k + 1)
+		//          << " idx_below=" << idx_below << std::endl;
 		index_t face_index = idx_above - parent.binomial_coeff(j, k + 1) + idx_below;
 		value_t face_diameter = parent.compute_diameter(face_index, dim - 1);
 		// Update values for next call
@@ -392,6 +403,7 @@ public:
 // Take a column (formal sum of simplices) and return the pivot element,
 // i.e. the largest simplex that does not cancel out
 // If and only if the column is zero, return (-1, -1)
+template <typename Column>
 index_diameter_t pop_pivot(Column& column) {
 	index_diameter_t pivot(-1, -1);
 	while(!column.empty()) {
@@ -412,6 +424,7 @@ index_diameter_t pop_pivot(Column& column) {
 
 // Note: May reduce to size of column by popping 'canceling' pivots but only
 // replacing one
+template <typename Column>
 index_diameter_t get_pivot(Column& column) {
 	index_diameter_t pivot = pop_pivot(column);
 	if(get_index(pivot) != -1) {
@@ -422,6 +435,7 @@ index_diameter_t get_pivot(Column& column) {
 
 // Add the coboundary column of simplex to the coboundary column working_coboundary
 // Add simplex to the working_reduction_column (matrix V)
+template <typename Column>
 void add_simplex_coboundary(ripser& ripser,
                             const index_diameter_t simplex,
                             const index_t dim,
@@ -437,6 +451,7 @@ void add_simplex_coboundary(ripser& ripser,
 	}
 }
 
+template <typename Column>
 void add_coboundary(ripser& ripser,
                     compressed_sparse_matrix& reduction_matrix,
                     const std::vector<index_diameter_t>& columns_to_reduce,
@@ -461,6 +476,50 @@ void add_coboundary(ripser& ripser,
 		                       dim,
 		                       working_reduction_column,
 		                       working_coboundary);
+	}
+}
+
+template <typename Column>
+void add_simplex_boundary(ripser &ripser,
+                          const index_diameter_t simplex,
+                          const index_t dim,
+                          Column& working_reduction_column,
+                          Column& working_boundary) {
+	simplex_boundary_enumerator facets(ripser);
+	working_reduction_column.push(simplex);
+	facets.set_simplex(simplex, dim);
+	while(facets.has_next()) {
+		index_diameter_t facet = facets.next();
+		//TODO(seb): Check diam <= threshold
+		working_boundary.push(facet);
+	}
+}
+
+template <typename Column>
+void add_boundary(ripser& ripser,
+                  compressed_sparse_matrix& reduction_matrix,
+                  const std::vector<index_diameter_t>& columns_to_reduce,
+                  const size_t index_column_to_add,
+                  const size_t dim,
+                  Column& working_reduction_column,
+                  Column& working_boundary) {
+	//TODO(seb): Do we need the correct diameter here?
+	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add));
+	add_simplex_boundary(ripser,
+	                     column_to_add,
+	                     dim,
+	                     working_reduction_column,
+	                     working_boundary);
+	// Computation of R_j due to implicit reduction
+	for(size_t i = reduction_matrix.column_start(index_column_to_add);
+	    i < reduction_matrix.column_end(index_column_to_add);
+	    ++i) {
+		index_diameter_t simplex = reduction_matrix.get_entry(i);
+		add_simplex_boundary(ripser,
+		                     simplex,
+		                     dim,
+		                     working_reduction_column,
+		                     working_boundary);
 	}
 }
 

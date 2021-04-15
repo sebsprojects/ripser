@@ -20,7 +20,8 @@ void print_simplices(ripser& ripser, std::vector<index_diameter_t>& simplices, i
 }
 
 void list_all_simplices(ripser& ripser) {
-	std::cout << "info: list of all simplices (id :: diam :: vertices)" << std::endl;
+	std::cout << "info: list of all simplices (id :: diam :: vertices)"
+	          << "      in ascending filtration order" << std::endl;
 	std::vector<index_diameter_t> simpl_prev;
 	std::vector<index_diameter_t> simpl_curr;
 	for(index_t i = 0; i < ripser.n; i++) {
@@ -28,6 +29,7 @@ void list_all_simplices(ripser& ripser) {
 		simpl_prev.push_back(index_diameter_t(i, diam));
 	}
 	std::cout << "  dim 0" << std::endl;
+	std::sort(simpl_prev.begin(), simpl_prev.end(), filtration_order);
 	print_simplices(ripser, simpl_prev, 0);
 	
 	simplex_coboundary_enumerator e(ripser);
@@ -39,6 +41,7 @@ void list_all_simplices(ripser& ripser) {
 		}
 	}
 	std::cout << "  dim 1:" << std::endl;
+	std::sort(simpl_curr.begin(), simpl_curr.end(), filtration_order);
 	print_simplices(ripser, simpl_curr, dim);
 	
 	simpl_prev.swap(simpl_curr);
@@ -51,6 +54,7 @@ void list_all_simplices(ripser& ripser) {
 		}
 	}
 	std::cout << "  dim 2:" << std::endl;
+	std::sort(simpl_curr.begin(), simpl_curr.end(), filtration_order);
 	print_simplices(ripser, simpl_curr, dim);
 }
 
@@ -82,6 +86,7 @@ void print_simplex(ripser& ripser, index_t simplex, index_t dim) {
 	printf("%s\n", buf);
 }
 
+template <typename Column>
 void print_column(ripser& ripser, Column &column, index_t dim) {
 	Column col(column); // copy
 	char buf[1024]; buf[0] = '\0';
