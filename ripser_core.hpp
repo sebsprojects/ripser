@@ -218,7 +218,16 @@ struct equal_index {
 	}
 };
 
-typedef std::unordered_map<index_t, size_t, index_hash, equal_index> entry_hash_map;
+// hash map with key = pivot index and value = (column index, basis element)
+// the column index is relative to the current dimension since we only have
+// a slice of V w.r.t to that dimension
+// We also store the basis element corresponding to V_j to reconstruct to
+// persistence pair in ripser_hom (needed in dim+1 where the column index is no
+// longer meaningful)
+typedef std::unordered_map<index_t,
+                           std::pair<size_t, index_diameter_t>,
+                           index_hash,
+                           equal_index> entry_hash_map;
 
 
 /* **************************************************************************
@@ -323,8 +332,8 @@ public:
 		dim = _dim;
 	}
 
-	bool has_next() {
-		return k >= 0;
+	bool has_next(bool all_facets = true) {
+		return (k >= 0);
 	}
 
 	index_diameter_t next() {

@@ -16,6 +16,9 @@ index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
                                              const index_diameter_t simplex,
                                              const index_t dim,
                                              Column& working_boundary) {
+	if(dim == 0) {
+		return index_diameter_t(-1, -1);
+	}
 	simplex_boundary_enumerator facets(ripser);
 	// std::vector<index_diameter_t> cofacet_entries;
 	facets.set_simplex(simplex, dim);
@@ -40,26 +43,29 @@ void assemble_columns_to_reduce(ripser &ripser,
                                 const index_t dim) {
 	columns_to_reduce.clear();
 	std::vector<index_diameter_t> next_simplices;
-	simplex_coboundary_enumerator cofacets(ripser);
+	simplex_boundary_enumerator facets(ripser);
 	for(index_diameter_t& simplex : simplices) {
-		cofacets.set_simplex(simplex, dim - 1);
-		while(cofacets.has_next(false)) {
+		facets.set_simplex(simplex, dim + 1);
+		while(facets.has_next()) {
 			//TODO(seb): Check diam <= threshold?
-			index_diameter_t cofacet = cofacets.next();
-			if(get_diameter(cofacet) <= ripser.threshold) {
-				next_simplices.push_back(cofacet);
-				columns_to_reduce.push_back(cofacet);
+			index_diameter_t facet = facets.next();
+			if(get_diameter(facet) <= ripser.threshold) {
+				// TODO: This should be done more efficiently in the enumerator
+				if(std::find(next_simplices.begin(), next_simplices.end(), facet) == next_simplices.end()) {
+					next_simplices.push_back(facet);
+					columns_to_reduce.push_back(facet);
+				}
 			}
 		}
 	}
 	simplices.swap(next_simplices);
-	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
-              filtration_order);
+	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), filtration_order);
 }
 
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
+                   entry_hash_map& previous_pivots,
                    const index_t dim) {
 	std::cout << "persistence intervals in dim " << dim << ":" << std::endl;
 	compressed_sparse_matrix reduction_matrix; // V
@@ -72,31 +78,28 @@ void compute_pairs(ripser &ripser,
 		index_diameter_t column_to_reduce = columns_to_reduce.at(j);
 		index_diameter_t pivot = init_boundary_and_get_pivot(ripser,
 		                                                     column_to_reduce,
-		                                                     dim + 1,
+		                                                     dim,
 		                                                     working_boundary);
-		print_column(ripser, working_boundary, dim);
-		print_simplex(ripser, get_index(pivot), dim);
-		value_t birth = get_diameter(column_to_reduce);
-		if(dim == 0 && birth == -INF) {
-			birth = 0;
-		}
+		//print_column(ripser, working_boundary, dim - 1);
+		//print_simplex(ripser, get_index(pivot), dim - 1);
 		//print_column(ripser, working_coboundary, dim);
 		// The reduction
 		//print_simplex(ripser, get_index(pivot), dim);
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
-				size_t index_column_to_add = pair->second;
+				size_t index_column_to_add = pair->second.first;
 				add_boundary(ripser,
 				             reduction_matrix,
 				             columns_to_reduce,
 				             index_column_to_add,
-				             dim + 1,
+				             dim,
 				             working_reduction_column,
 				             working_boundary);
 				pivot = get_pivot(working_boundary);
 			} else {
-				pivot_column_index.insert({get_index(pivot), j});
+				pivot_column_index.insert({get_index(pivot),
+				                          {j, column_to_reduce}});
 				break;
 			}
 		}
@@ -107,14 +110,23 @@ void compute_pairs(ripser &ripser,
 			e = pop_pivot(working_reduction_column);
 		}
 		// Determine Persistence Pair
+		value_t birth = get_diameter(column_to_reduce);
+		if(dim == 0 && birth == -INF) {
+			birth = 0;
+		}
 		if(get_index(pivot) != -1) {
-			value_t death = get_diameter(pivot);
-			if(death > birth * ripser.ratio) {
-				std::cout << " [" << birth << "," << death << ")" << std::endl;
-			}
+			//
 		} else {
-			// Zero column, persistent homology "pair"
-			std::cout << " [" << birth << ", )" << std::endl;
+			// Zero column
+			auto pair = previous_pivots.find(get_index(column_to_reduce));
+			if(pair == previous_pivots.end()) {
+				std::cout << " [" << birth << ", )" << std::endl;
+			} else {
+				value_t death = get_diameter(pair->second.second);
+				if(death > birth * ripser.ratio) {
+					std::cout << " [" << birth << "," << death << ")" << std::endl;
+				}
+			}
 		}
 		//print_mat(reduction_matrix);
 		//print_v(reduction_matrix, columns_to_reduce);
@@ -123,17 +135,39 @@ void compute_pairs(ripser &ripser,
 }
 
 void compute_barcodes(ripser& ripser) {
+	std::vector<index_diameter_t> previous_simplices;
 	std::vector<index_diameter_t> simplices;
+	entry_hash_map pivot_column_index;
+	entry_hash_map previous_pivots;
+	// Vertices
 	for(index_t i = 0; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
 	}
-	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
+	// Enumerate all (max_dim+1) simplices by iteratively going up from dim=0
+	// and enumerating coboundaries
+	simplex_coboundary_enumerator e(ripser);
+	for(index_t dim = 0; dim < ripser.dim_max + 1; dim++) {
+		previous_simplices.swap(simplices);
+		simplices.clear();
+		for(index_diameter_t simp : previous_simplices) {
+			e.set_simplex(simp, dim);
+			while(e.has_next(false)) {
+				simplices.push_back(e.next());
+			}
+		}
+	}
+	for(index_t dim = ripser.dim_max + 1; dim >= 0; --dim) {
 		std::vector<index_diameter_t> columns_to_reduce;
-		entry_hash_map pivot_column_index;
-		assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim + 1);
+		if(dim == ripser.dim_max + 1) {
+			columns_to_reduce = std::vector<index_diameter_t>(simplices);
+		} else {
+			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
+		}
+		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
-		compute_pairs(ripser, columns_to_reduce, pivot_column_index, dim);
+		compute_pairs(ripser, columns_to_reduce, pivot_column_index, previous_pivots, dim);
+		previous_pivots.swap(pivot_column_index);
 	}
 }
 

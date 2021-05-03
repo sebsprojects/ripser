@@ -74,10 +74,6 @@ void compute_pairs(ripser &ripser,
 		                                                       column_to_reduce,
 		                                                       dim,
 		                                                       working_coboundary);
-		value_t birth = get_diameter(column_to_reduce);
-		if(dim == 0 && birth == -INF) {
-			birth = 0;
-		}
 		// The reduction
 		// The loop terminates on either of two conditions
 		//   1. R_j got reduced to a zero column with pivot index -1 (the loop condiiton)
@@ -85,7 +81,7 @@ void compute_pairs(ripser &ripser,
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
-				size_t index_column_to_add = pair->second;
+				size_t index_column_to_add = pair->second.first;
 				add_coboundary(ripser,
 				               reduction_matrix,
 				               columns_to_reduce,
@@ -95,7 +91,8 @@ void compute_pairs(ripser &ripser,
 				               working_coboundary);
 				pivot = get_pivot(working_coboundary);
 			} else {
-				pivot_column_index.insert({get_index(pivot), j});
+				pivot_column_index.insert({get_index(pivot),
+				                          {j, column_to_reduce}});
 				//std::cout << "Break Condition" << std::endl;
 				break;
 			}
@@ -107,6 +104,10 @@ void compute_pairs(ripser &ripser,
 			e = pop_pivot(working_reduction_column);
 		}
 		// Determine Persistence Pair
+		value_t birth = get_diameter(column_to_reduce);
+		if(dim == 0 && birth == -INF) {
+			birth = 0;
+		}
 		if(get_index(pivot) != -1) {
 			value_t death = get_diameter(pivot);
 			if(death > birth * ripser.ratio) {
@@ -137,20 +138,15 @@ void compute_barcodes(ripser& ripser) {
 	}
 	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
 		std::vector<index_diameter_t> columns_to_reduce;
-		pivot_column_index.clear();
-		pivot_column_index.reserve(columns_to_reduce.size());
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
 		} else {
 			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
 		}
-		//std::vector<index_diameter_t> ctr;
-		//for(auto c : columns_to_reduce) {
-		//	if(get_index(c) == 1 || get_index(c) == 4 || get_index(c) == 0) {
-		//		ctr.push_back(c);
-		//	}
-		//}
+		pivot_column_index.clear();
+		pivot_column_index.reserve(columns_to_reduce.size());
 		compute_pairs(ripser, columns_to_reduce, pivot_column_index, previous_pivots, dim);
+		//TODO(seb): reserve enough space in previous_pivots?
 		previous_pivots.swap(pivot_column_index);
 	}
 }
