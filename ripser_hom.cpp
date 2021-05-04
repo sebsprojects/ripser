@@ -84,7 +84,7 @@ void compute_pairs(ripser &ripser,
 		//print_simplex(ripser, get_index(pivot), dim - 1);
 		//print_column(ripser, working_coboundary, dim);
 		// The reduction
-		//print_simplex(ripser, get_index(pivot), dim);
+		//print_simplex(ripser, get_index(column_to_reduce), dim);
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
@@ -123,9 +123,11 @@ void compute_pairs(ripser &ripser,
 				std::cout << " [" << birth << ", )" << std::endl;
 			} else {
 				value_t death = get_diameter(pair->second.second);
-				if(death > birth * ripser.ratio) {
+				//if(death > birth * ripser.ratio) {
 					std::cout << " [" << birth << "," << death << ")" << std::endl;
-				}
+				//	          << " {" << get_index(column_to_reduce)
+				//	          << ", " << get_index(pair->second.second) << "}" << std::endl;
+				//}
 			}
 		}
 		//print_mat(reduction_matrix);
@@ -157,6 +159,7 @@ void compute_barcodes(ripser& ripser) {
 			}
 		}
 	}
+	std::sort(simplices.begin(), simplices.end(), filtration_order);
 	for(index_t dim = ripser.dim_max + 1; dim >= 0; --dim) {
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == ripser.dim_max + 1) {

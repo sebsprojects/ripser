@@ -110,10 +110,12 @@ void compute_pairs(ripser &ripser,
 		}
 		if(get_index(pivot) != -1) {
 			value_t death = get_diameter(pivot);
-			if(death > birth * ripser.ratio) {
+			//if(death > birth * ripser.ratio) {
 				// Non-essential pair
 				std::cout << " [" << birth << "," << death << ")" << std::endl;
-			}
+				//	      << " {" << get_index(column_to_reduce)
+				//	      << ", " << get_index(pivot) << "}" << std::endl;
+			//}
 		} else {
 			// Zero column
 			auto pair = previous_pivots.find(get_index(column_to_reduce));
