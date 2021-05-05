@@ -225,7 +225,7 @@ struct equal_index {
 // persistence pair in ripser_hom (needed in dim+1 where the column index is no
 // longer meaningful)
 typedef std::unordered_map<index_t,
-                           std::pair<size_t, index_diameter_t>,
+                           size_t,
                            index_hash,
                            equal_index> entry_hash_map;
 

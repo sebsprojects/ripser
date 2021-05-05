@@ -79,7 +79,7 @@ void compute_pairs(ripser &ripser,
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
-				size_t index_column_to_add = pair->second.first;
+				size_t index_column_to_add = pair->second;
 				add_coboundary(ripser,
 				               reduction_matrix,
 				               columns_to_reduce,
@@ -89,8 +89,7 @@ void compute_pairs(ripser &ripser,
 				               working_coboundary);
 				pivot = get_pivot(working_coboundary);
 			} else {
-				pivot_column_index.insert({get_index(pivot),
-				                          {j, column_to_reduce}});
+				pivot_column_index.insert({get_index(pivot), j});
 				//std::cout << "Break Condition" << std::endl;
 				break;
 			}
@@ -111,8 +110,6 @@ void compute_pairs(ripser &ripser,
 			if(death > birth * ripser.ratio) {
 				// Non-essential pair
 				std::cout << " [" << birth << "," << death << ")" << std::endl;
-				//	      << " {" << get_index(column_to_reduce)
-				//	      << ", " << get_index(pivot) << "}" << std::endl;
 			}
 		} else {
 			// Zero column
@@ -121,10 +118,9 @@ void compute_pairs(ripser &ripser,
 				// Essential index!
 				std::cout << " [" << birth << ", )" << std::endl;
 			} else {
-				// Corresponds to a killing index of some cycle in dim - 1
+				// Killing index non-essential pair
 			}
 		}
-		//print_v(reduction_matrix, columns_to_reduce);
 	}
 }
 

@@ -61,6 +61,7 @@ void assemble_columns_to_reduce(ripser &ripser,
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), filtration_order);
 }
 
+// TODO: Output for essential pairs is shifted by one dimension
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
@@ -79,15 +80,11 @@ void compute_pairs(ripser &ripser,
 		                                                     column_to_reduce,
 		                                                     dim,
 		                                                     working_boundary);
-		//print_column(ripser, working_boundary, dim - 1);
-		//print_simplex(ripser, get_index(pivot), dim - 1);
-		//print_column(ripser, working_coboundary, dim);
 		// The reduction
-		//print_simplex(ripser, get_index(column_to_reduce), dim);
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
-				size_t index_column_to_add = pair->second.first;
+				size_t index_column_to_add = pair->second;
 				add_boundary(ripser,
 				             reduction_matrix,
 				             columns_to_reduce,
@@ -97,8 +94,7 @@ void compute_pairs(ripser &ripser,
 				             working_boundary);
 				pivot = get_pivot(working_boundary);
 			} else {
-				pivot_column_index.insert({get_index(pivot),
-				                          {j, column_to_reduce}});
+				pivot_column_index.insert({get_index(pivot), j});
 				break;
 			}
 		}
@@ -109,29 +105,36 @@ void compute_pairs(ripser &ripser,
 			e = pop_pivot(working_reduction_column);
 		}
 		// Determine Persistence Pair
-		value_t birth = get_diameter(column_to_reduce);
-		if(dim == 0 && birth == -INF) {
-			birth = 0;
-		}
 		if(get_index(pivot) != -1) {
-			//
+			// Non-essential death index (birth in dimension dim - 1)
+			value_t birth = get_diameter(pivot);
+			if(dim == 1 && birth == -INF) {
+				birth = 0;
+			}
+			value_t death = get_diameter(column_to_reduce);
+			if(death > birth * ripser.ratio) {
+				std::cout << " [" << birth << "," << death << ")" << std::endl;
+			}
 		} else {
 			// Zero column
 			auto pair = previous_pivots.find(get_index(column_to_reduce));
 			if(pair == previous_pivots.end()) {
-				std::cout << " [" << birth << ", )" << std::endl;
-			} else {
-				value_t death = get_diameter(pair->second.second);
-				if(death > birth * ripser.ratio) {
-					std::cout << " [" << birth << "," << death << ")" << std::endl;
-				//	          << " {" << get_index(column_to_reduce)
-				//	          << ", " << get_index(pair->second.second) << "}" << std::endl;
+				value_t birth = get_diameter(column_to_reduce);
+				if(dim == 0 && birth == -INF) {
+					birth = 0;
 				}
+				// Since in homology (in contrast to cohomology) we need to go
+				// up to dim_max+1 to compute non-essential pairs of dimension
+				// dim_max we would get essential pairs in too high dimension
+				// Thus this clause
+				if(dim <= ripser.dim_max) {
+					// Essential birth index (birth in dimension dim)
+					std::cout << " [" << birth << ", )" << std::endl;
+				}
+			} else {
+				// Birth index of non-essential pair
 			}
 		}
-		//print_mat(reduction_matrix);
-		//print_v(reduction_matrix, columns_to_reduce);
-		//std::cout << "-------------------------------------" << std::endl;
 	}
 }
 
@@ -147,14 +150,18 @@ void compute_barcodes(ripser& ripser) {
 	}
 	// Enumerate all (max_dim+1) simplices by iteratively going up from dim=0
 	// and enumerating coboundaries
-	simplex_coboundary_enumerator e(ripser);
+	simplex_coboundary_enumerator cofacets(ripser);
 	for(index_t dim = 0; dim < ripser.dim_max + 1; dim++) {
 		previous_simplices.swap(simplices);
 		simplices.clear();
 		for(index_diameter_t simp : previous_simplices) {
-			e.set_simplex(simp, dim);
-			while(e.has_next(false)) {
-				simplices.push_back(e.next());
+			cofacets.set_simplex(simp, dim);
+			while(cofacets.has_next(false)) {
+				index_diameter_t cofacet = cofacets.next();
+				// Threshold check
+				if(get_diameter(cofacet) <= ripser.threshold) {
+					simplices.push_back(cofacet);
+				}
 			}
 		}
 		std::sort(simplices.begin(), simplices.end(), filtration_order);
@@ -165,9 +172,6 @@ void compute_barcodes(ripser& ripser) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
 		} else {
 			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
-			//for(auto simp : columns_to_reduce) {
-			//	std::cout << get_index(simp) << std::endl;
-			//}
 		}
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
