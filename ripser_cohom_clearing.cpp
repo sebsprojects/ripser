@@ -31,9 +31,13 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 // to contain all cofacets of those simplices
 // ordered column indices (indexed by dim-simplices) of the coboundary matrix
 // Sets simplices to contain all dim-simplices
+//
+// Clearing: We take the pivots from the reduction in dim-1 and ignore columns
+// that appeared as a pivot
 void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& simplices,
                                 std::vector<index_diameter_t>& columns_to_reduce,
+                                entry_hash_map& pivot_column_index,
                                 const index_t dim) {
 	columns_to_reduce.clear();
 	std::vector<index_diameter_t> next_simplices;
@@ -43,9 +47,13 @@ void assemble_columns_to_reduce(ripser &ripser,
 		while(cofacets.has_next(false)) {
 			index_diameter_t cofacet = cofacets.next();
 			// Threshold check
+			next_simplices.push_back(cofacet);
 			if(get_diameter(cofacet) <= ripser.threshold) {
-				next_simplices.push_back(cofacet);
-				columns_to_reduce.push_back(cofacet);
+				// Clearing check
+				if(pivot_column_index.find(get_index(cofacet)) ==
+				   pivot_column_index.end()) {
+					columns_to_reduce.push_back(cofacet);
+				}
 			}
 		}
 	}
@@ -57,7 +65,6 @@ void assemble_columns_to_reduce(ripser &ripser,
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
-                   const entry_hash_map& previous_pivots,
                    const index_t dim) {
 	std::cout << "persistence intervals in dim " << dim << ":" << std::endl;
 	compressed_sparse_matrix reduction_matrix; // V
@@ -79,7 +86,7 @@ void compute_pairs(ripser &ripser,
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
-				size_t index_column_to_add = pair->second;
+				size_t index_column_to_add = pair->second.first;
 				add_coboundary(ripser,
 				               reduction_matrix,
 				               columns_to_reduce,
@@ -89,7 +96,8 @@ void compute_pairs(ripser &ripser,
 				               working_coboundary);
 				pivot = get_pivot(working_coboundary);
 			} else {
-				pivot_column_index.insert({get_index(pivot), j});
+				pivot_column_index.insert({get_index(pivot),
+				                          {j, column_to_reduce}});
 				break;
 			}
 		}
@@ -112,13 +120,10 @@ void compute_pairs(ripser &ripser,
 			}
 		} else {
 			// Zero column
-			auto pair = previous_pivots.find(get_index(column_to_reduce));
-			if(pair == previous_pivots.end()) {
-				// Essential index!
-				std::cout << " [" << birth << ", )" << std::endl;
-			} else {
-				// Killing index non-essential pair
-			}
+			// Since we use clearing, zero columns that correspond to killing
+			// simplices are filtered out by assemble_columns_to_reduce
+			// Thus all zero columns are birth indices of an essential pair
+			std::cout << " [" << birth << ", )" << std::endl;
 		}
 	}
 }
@@ -126,7 +131,6 @@ void compute_pairs(ripser &ripser,
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
-	entry_hash_map previous_pivots;
 	for(index_t i = 0; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
@@ -136,13 +140,13 @@ void compute_barcodes(ripser& ripser) {
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
 		} else {
-			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
+			// Takes the pivots from the previous iteration
+			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce,
+			                           pivot_column_index, dim);
 		}
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
-		compute_pairs(ripser, columns_to_reduce, pivot_column_index, previous_pivots, dim);
-		//TODO(seb): reserve enough space in previous_pivots?
-		previous_pivots.swap(pivot_column_index);
+		compute_pairs(ripser, columns_to_reduce, pivot_column_index, dim);
 	}
 }
 
