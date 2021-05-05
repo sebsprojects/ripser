@@ -455,8 +455,10 @@ void add_simplex_coboundary(ripser& ripser,
 	cofacets.set_simplex(simplex, dim);
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
-		//TODO(seb): Check diam <= threshold
-		working_coboundary.push(cofacet);
+		// Threshold check
+		if(get_diameter(cofacet) <= ripser.threshold) {
+			working_coboundary.push(cofacet);
+		}
 	}
 }
 
@@ -499,8 +501,9 @@ void add_simplex_boundary(ripser &ripser,
 	facets.set_simplex(simplex, dim);
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
-		//TODO(seb): Check diam <= threshold
-		working_boundary.push(facet);
+		if(get_diameter(facet) <= ripser.threshold) {
+			working_boundary.push(facet);
+		}
 	}
 }
 

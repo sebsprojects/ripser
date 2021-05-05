@@ -16,15 +16,13 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
                                                const index_t dim,
                                                Column& working_coboundary) {
 	simplex_coboundary_enumerator cofacets(ripser);
-	// std::vector<index_diameter_t> cofacet_entries;
 	cofacets.set_simplex(simplex, dim);
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
-		//TODO(seb): Check diam <= threshold
-		//cofacet_entries.push_back(cofacet);
-	//}
-	//for(index_diameter_t cofacet : cofacet_entries) {
-		working_coboundary.push(cofacet);
+		// Threshold check
+		if(get_diameter(cofacet) <= ripser.threshold) {
+			working_coboundary.push(cofacet);
+		}
 	}
 	return get_pivot(working_coboundary);
 }
@@ -43,8 +41,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 	for(index_diameter_t& simplex : simplices) {
 		cofacets.set_simplex(simplex, dim - 1);
 		while(cofacets.has_next(false)) {
-			//TODO(seb): Check diam <= threshold?
 			index_diameter_t cofacet = cofacets.next();
+			// Threshold check
 			if(get_diameter(cofacet) <= ripser.threshold) {
 				next_simplices.push_back(cofacet);
 				columns_to_reduce.push_back(cofacet);
@@ -110,12 +108,12 @@ void compute_pairs(ripser &ripser,
 		}
 		if(get_index(pivot) != -1) {
 			value_t death = get_diameter(pivot);
-			//if(death > birth * ripser.ratio) {
+			if(death > birth * ripser.ratio) {
 				// Non-essential pair
 				std::cout << " [" << birth << "," << death << ")" << std::endl;
 				//	      << " {" << get_index(column_to_reduce)
 				//	      << ", " << get_index(pivot) << "}" << std::endl;
-			//}
+			}
 		} else {
 			// Zero column
 			auto pair = previous_pivots.find(get_index(column_to_reduce));

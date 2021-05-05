@@ -24,11 +24,10 @@ index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
 	facets.set_simplex(simplex, dim);
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
-		//TODO(seb): Check diam <= threshold
-		//cofacet_entries.push_back(cofacet);
-	//}
-	//for(index_diameter_t cofacet : cofacet_entries) {
-		working_boundary.push(facet);
+		// Threshold check
+		if(get_diameter(facet) <= ripser.threshold) {
+			working_boundary.push(facet);
+		}
 	}
 	return get_pivot(working_boundary);
 }
@@ -47,8 +46,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 	for(index_diameter_t& simplex : simplices) {
 		facets.set_simplex(simplex, dim + 1);
 		while(facets.has_next()) {
-			//TODO(seb): Check diam <= threshold?
 			index_diameter_t facet = facets.next();
+			// Threshold check
 			if(get_diameter(facet) <= ripser.threshold) {
 				// TODO: This should be done more efficiently in the enumerator
 				if(std::find(next_simplices.begin(), next_simplices.end(), facet) == next_simplices.end()) {
@@ -123,11 +122,11 @@ void compute_pairs(ripser &ripser,
 				std::cout << " [" << birth << ", )" << std::endl;
 			} else {
 				value_t death = get_diameter(pair->second.second);
-				//if(death > birth * ripser.ratio) {
+				if(death > birth * ripser.ratio) {
 					std::cout << " [" << birth << "," << death << ")" << std::endl;
 				//	          << " {" << get_index(column_to_reduce)
 				//	          << ", " << get_index(pair->second.second) << "}" << std::endl;
-				//}
+				}
 			}
 		}
 		//print_mat(reduction_matrix);
@@ -158,14 +157,17 @@ void compute_barcodes(ripser& ripser) {
 				simplices.push_back(e.next());
 			}
 		}
+		std::sort(simplices.begin(), simplices.end(), filtration_order);
 	}
-	std::sort(simplices.begin(), simplices.end(), filtration_order);
 	for(index_t dim = ripser.dim_max + 1; dim >= 0; --dim) {
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == ripser.dim_max + 1) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
 		} else {
 			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
+			//for(auto simp : columns_to_reduce) {
+			//	std::cout << get_index(simp) << std::endl;
+			//}
 		}
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
