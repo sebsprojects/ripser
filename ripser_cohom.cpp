@@ -54,12 +54,41 @@ void assemble_columns_to_reduce(ripser &ripser,
               reverse_filtration_order);
 }
 
+/*
+void compute_dim_0_pairs(ripser& ripser,
+                         std::vector<diameter_index_t>& edges,
+                         std::vector<diameter_index_t>& columns_to_reduce,
+                         entry_hash_map& p) {
+	union_find dset(n);
+	edges = get_edges();
+	std::sort(edges.rbegin(), edges.rend(), greater_diameter_or_smaller_index);
+	std::vector<index_t> vertices_of_edge(2);
+	for(auto e : edges) {
+		get_simplex_vertices(get_index(e), 1, n, vertices_of_edge.rbegin());
+		index_t u = dset.find(vertices_of_edge[0]), v = dset.find(vertices_of_edge[1]);
+		if(u != v) {
+			if(get_diameter(e) != 0) {
+				std::cout << " [0," << get_diameter(e) << ")" << std::endl;
+			}
+			dset.link(u, v);
+		} else {
+			columns_to_reduce.push_back(e);
+		}
+	}
+	std::reverse(columns_to_reduce.begin(), columns_to_reduce.end());
+	for(index_t i = 0; i < n; ++i) {
+		if(dset.find(i) == i) {
+		  std::cout << " [0, )" << std::endl;
+		}
+	}
+}
+*/
+
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
                    const entry_hash_map& previous_pivots,
                    const index_t dim) {
-	std::cout << "persistence intervals in dim " << dim << ":" << std::endl;
 	compressed_sparse_matrix reduction_matrix; // V
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		reduction_matrix.append_column();
@@ -101,21 +130,18 @@ void compute_pairs(ripser &ripser,
 		}
 		// Determine Persistence Pair
 		value_t birth = get_diameter(column_to_reduce);
-		if(dim == 0 && birth == -INF) {
-			birth = 0;
-		}
 		if(get_index(pivot) != -1) {
 			value_t death = get_diameter(pivot);
 			if(death > birth * ripser.ratio) {
 				// Non-essential pair
-				std::cout << " [" << birth << "," << death << ")" << std::endl;
+				ripser.barcodes.at(dim).add_interval(birth, death);
 			}
 		} else {
 			// Zero column
 			auto pair = previous_pivots.find(get_index(column_to_reduce));
 			if(pair == previous_pivots.end()) {
 				// Essential index!
-				std::cout << " [" << birth << ", )" << std::endl;
+				ripser.barcodes.at(dim).add_interval(birth, INF);
 			} else {
 				// Killing index non-essential pair
 			}
@@ -124,6 +150,7 @@ void compute_pairs(ripser &ripser,
 }
 
 void compute_barcodes(ripser& ripser) {
+	ripser.barcodes.clear();
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
 	entry_hash_map previous_pivots;
@@ -132,6 +159,7 @@ void compute_barcodes(ripser& ripser) {
 		simplices.push_back(index_diameter_t(i, diam));
 	}
 	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
+		ripser.barcodes.push_back(barcode(dim));
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
@@ -173,5 +201,6 @@ int main(int argc, char** argv) {
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
 	list_all_simplices(ripser);
 	compute_barcodes(ripser);
+	print_barcodes(ripser.barcodes);
 	exit(0);
 }

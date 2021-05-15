@@ -57,6 +57,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 					if(pivot_column_index.find(get_index(facet)) ==
 					   pivot_column_index.end()) {
 						columns_to_reduce.push_back(facet);
+					} else {
+						ripser.barcodes.at(ripser.dim_max - dim).clearing_count++;
 					}
 				}
 			}
@@ -71,7 +73,6 @@ void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
                    const index_t dim) {
-	std::cout << "persistence intervals in dim " << dim << ":" << std::endl;
 	compressed_sparse_matrix reduction_matrix; // V
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		reduction_matrix.append_column();
@@ -109,15 +110,14 @@ void compute_pairs(ripser &ripser,
 			e = pop_pivot(working_reduction_column);
 		}
 		// Determine Persistence Pair
+		// Note here, that we iterate with decreasing dimension, thus we index
+		// dim_max - dim into barcodes
 		if(get_index(pivot) != -1) {
 			// Non-essential death index (birth in dimension dim - 1)
 			value_t birth = get_diameter(pivot);
-			if(dim == 1 && birth == -INF) {
-				birth = 0;
-			}
 			value_t death = get_diameter(column_to_reduce);
 			if(death > birth * ripser.ratio) {
-				std::cout << " [" << birth << "," << death << ")" << std::endl;
+				ripser.barcodes.at(ripser.dim_max - dim + 1).add_interval(birth, death);
 			}
 		} else {
 			// Zero column
@@ -134,13 +134,14 @@ void compute_pairs(ripser &ripser,
 			// Thus this clause
 			if(dim <= ripser.dim_max) {
 				// Essential birth index (birth in dimension dim)
-				std::cout << " [" << birth << ", )" << std::endl;
+				ripser.barcodes.at(ripser.dim_max - dim).add_interval(birth, INF);
 			}
 		}
 	}
 }
 
 void compute_barcodes(ripser& ripser) {
+	ripser.barcodes.clear();
 	std::vector<index_diameter_t> previous_simplices;
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
@@ -167,7 +168,12 @@ void compute_barcodes(ripser& ripser) {
 		}
 		std::sort(simplices.begin(), simplices.end(), filtration_order);
 	}
+	ripser.barcodes.push_back(barcode(ripser.dim_max));
 	for(index_t dim = ripser.dim_max + 1; dim >= 0; --dim) {
+		// We need the barcode of dim-1 already in dim
+		if(dim > 0 && dim <= ripser.dim_max) {
+			ripser.barcodes.push_back(barcode(dim - 1));
+		}
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == ripser.dim_max + 1) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
@@ -208,5 +214,6 @@ int main(int argc, char** argv) {
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
 	list_all_simplices(ripser);
 	compute_barcodes(ripser);
+	print_barcodes(ripser.barcodes, true);
 	exit(0);
 }

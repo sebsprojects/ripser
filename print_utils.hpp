@@ -4,6 +4,37 @@
 #include "ripser_core.hpp"
 
 
+void print_barcode(barcode& barcode, bool include_stats=false) {
+	std::cout << "persistence intervals in dim " << barcode.dim << ":";
+	if(include_stats) {
+		std::cout << " [ c=" << barcode.clearing_count
+		          << ", e=" << barcode.emergent_count
+		          << ", a=" << barcode.apparent_count << " ]";
+	}
+	std::cout << std::endl;
+	std::sort(barcode.persistence_intervals.begin(),
+	          barcode.persistence_intervals.end(),
+	          persistence_interval_order);
+		
+	for(auto interval : barcode.persistence_intervals) {
+		value_t birth = std::max(0.0f, interval.first);
+		value_t death = interval.second;
+		std::cout << "[" << birth;
+		if(death == INF) {
+			std::cout << ", )" << std::endl;
+		} else {
+			std::cout << "," << death << ")" << std::endl;
+		}
+	}
+}
+
+void print_barcodes(std::vector<barcode>& barcodes, bool include_stats=false) {
+	std::sort(barcodes.begin(), barcodes.end(), barcode_order);
+	for(auto b : barcodes) {
+		print_barcode(b, include_stats);
+	}
+}
+
 void print_simplices(ripser& ripser, std::vector<index_diameter_t>& simplices, index_t d) {
   std::vector<index_t> vertices(ripser.n, -1);
   for(auto s : simplices) {

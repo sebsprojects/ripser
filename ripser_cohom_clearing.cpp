@@ -53,6 +53,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 				if(pivot_column_index.find(get_index(cofacet)) ==
 				   pivot_column_index.end()) {
 					columns_to_reduce.push_back(cofacet);
+				} else {
+					ripser.barcodes.at(dim).clearing_count++;
 				}
 			}
 		}
@@ -108,21 +110,18 @@ void compute_pairs(ripser &ripser,
 		}
 		// Determine Persistence Pair
 		value_t birth = get_diameter(column_to_reduce);
-		if(dim == 0 && birth == -INF) {
-			birth = 0;
-		}
 		if(get_index(pivot) != -1) {
 			value_t death = get_diameter(pivot);
 			if(death > birth * ripser.ratio) {
 				// Non-essential pair
-				std::cout << " [" << birth << "," << death << ")" << std::endl;
+				ripser.barcodes.at(dim).add_interval(birth, death);
 			}
 		} else {
 			// Zero column
 			// Since we use clearing, zero columns that correspond to killing
 			// simplices are filtered out by assemble_columns_to_reduce
 			// Thus all zero columns are birth indices of an essential pair
-			std::cout << " [" << birth << ", )" << std::endl;
+			ripser.barcodes.at(dim).add_interval(birth, INF);
 		}
 	}
 }
@@ -135,6 +134,7 @@ void compute_barcodes(ripser& ripser) {
 		simplices.push_back(index_diameter_t(i, diam));
 	}
 	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
+		ripser.barcodes.push_back(barcode(dim));
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
@@ -176,5 +176,6 @@ int main(int argc, char** argv) {
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
 	list_all_simplices(ripser);
 	compute_barcodes(ripser);
+	print_barcodes(ripser.barcodes, true);
 	exit(0);
 }

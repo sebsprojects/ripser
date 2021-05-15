@@ -39,8 +39,11 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 				if((pivot_column_index.find(get_index(cofacet)) ==
 				    pivot_column_index.end())) {
 					// working_coboundary is the 0-column
+					std::cout << "Found Emergent Pair" << std::endl;
+					ripser.barcodes.at(dim).emergent_count++;
 					return cofacet;
 				}
+				std::cout << "Candidate failed" << std::endl;
 				check_for_emergent_pair = false;
 			}
 		}
@@ -126,21 +129,18 @@ void compute_pairs(ripser &ripser,
 		}
 		// Determine Persistence Pair
 		value_t birth = get_diameter(column_to_reduce);
-		if(dim == 0 && birth == -INF) {
-			birth = 0;
-		}
 		if(get_index(pivot) != -1) {
 			value_t death = get_diameter(pivot);
 			if(death > birth * ripser.ratio) {
 				// Non-essential pair
-				std::cout << " [" << birth << "," << death << ")" << std::endl;
+				ripser.barcodes.at(dim).add_interval(birth, death);
 			}
 		} else {
 			// Zero column
 			auto pair = previous_pivots.find(get_index(column_to_reduce));
 			if(pair == previous_pivots.end()) {
 				// Essential index!
-				std::cout << " [" << birth << ", )" << std::endl;
+				ripser.barcodes.at(dim).add_interval(birth, INF);
 			} else {
 				// Killing index non-essential pair
 			}
@@ -149,6 +149,7 @@ void compute_pairs(ripser &ripser,
 }
 
 void compute_barcodes(ripser& ripser) {
+	ripser.barcodes.clear();
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
 	entry_hash_map previous_pivots;
@@ -157,6 +158,7 @@ void compute_barcodes(ripser& ripser) {
 		simplices.push_back(index_diameter_t(i, diam));
 	}
 	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
+		ripser.barcodes.push_back(barcode(dim));
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
@@ -198,5 +200,6 @@ int main(int argc, char** argv) {
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
 	list_all_simplices(ripser);
 	compute_barcodes(ripser);
+	print_barcodes(ripser.barcodes, true);
 	exit(0);
 }

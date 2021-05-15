@@ -234,6 +234,34 @@ typedef std::unordered_map<index_t,
  * Ripser
  * *************************************************************************/
 
+struct barcode {
+	index_t dim;
+	std::vector<std::pair<value_t, value_t>> persistence_intervals;
+	size_t clearing_count;
+	size_t emergent_count;
+	size_t apparent_count;
+
+	barcode(index_t _dim)
+		: dim(_dim), persistence_intervals(),
+		  clearing_count(0),
+		  emergent_count(0),
+		  apparent_count(0)
+	{ }
+
+	void add_interval(value_t birth, value_t death) {
+		persistence_intervals.push_back(std::make_pair(birth, death));
+	}
+};
+
+bool barcode_order(const barcode& a, const barcode& b) {
+	return a.dim < b.dim;
+}
+
+bool persistence_interval_order(std::pair<value_t, value_t>& a,
+                                std::pair<value_t, value_t>& b) {
+	return (a.first < b.first) || (a.first == b.first && a.second < b.second);
+}
+
 struct ripser {
 
 	const DistanceMatrix dist;
@@ -243,11 +271,14 @@ struct ripser {
 	const float ratio;
 	const binomial_coeff_table binomial_coeff;
 	
+	// Output
+	mutable std::vector<barcode> barcodes;
+
 	ripser(DistanceMatrix&& _dist, index_t _dim_max, value_t _threshold, float _ratio)
 		: dist(std::move(_dist)), n(dist.size()),
-		dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
-		threshold(_threshold), ratio(_ratio),
-		binomial_coeff(n, dim_max + 2)
+		  dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
+		  threshold(_threshold), ratio(_ratio),
+		  binomial_coeff(n, dim_max + 2)
 	{ }
 	
 	// For a k-simplex idx, return the vertex (of idx) of maximal index
@@ -533,6 +564,60 @@ void add_boundary(ripser& ripser,
 		                     working_reduction_column,
 		                     working_boundary);
 	}
+}
+
+
+/* **************************************************************************
+ * Union Find
+ * *************************************************************************/
+
+struct union_find {
+	std::vector<index_t> parent;
+	std::vector<uint8_t> rank;
+
+	union_find(const index_t n) : parent(n), rank(n, 0) {
+		for (index_t i = 0; i < n; ++i) parent[i] = i;
+	}
+
+	index_t find(index_t x) {
+		index_t y = x, z;
+		while((z = parent[y]) != y) {
+		  y = z;
+		}
+		while((z = parent[x]) != y) {
+			parent[x] = y;
+			x = z;
+		}
+		return z;
+	}
+
+	void link(index_t x, index_t y) {
+		if((x = find(x)) == (y = find(y))) {
+		  return;
+		}
+		if(rank[x] > rank[y]) {
+			parent[y] = x;
+		} else {
+			parent[x] = y;
+			if (rank[x] == rank[y]) {
+			  ++rank[y];
+			}
+		}
+	}
+};
+
+std::vector<index_diameter_t> get_edges(ripser& ripser) {
+	std::vector<index_diameter_t> edges;
+	std::vector<index_t> vertices(2);
+	for(index_t index = ripser.binomial_coeff(ripser.n, 2); index-- > 0;) {
+		ripser.get_simplex_vertices(index, 1, ripser.dist.size(), vertices);
+		value_t length = ripser.dist(vertices[0], vertices[1]);
+		// Threshold check
+		if(length <= ripser.threshold) {
+			edges.push_back({length, index});
+		}
+	}
+	return edges;
 }
 
 
