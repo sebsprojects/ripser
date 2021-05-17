@@ -218,7 +218,7 @@ struct equal_index {
 	}
 };
 
-// hash map with key = pivot index and value = (column index, basis element)
+// hash map with key = pivot index and value = column index
 // the column index is relative to the current dimension since we only have
 // a slice of V w.r.t to that dimension
 // We also store the basis element corresponding to V_j to reconstruct to

@@ -57,26 +57,34 @@ void assemble_columns_to_reduce(ripser &ripser,
 void compute_dim_0_pairs(ripser& ripser,
                          std::vector<index_diameter_t>& edges,
                          std::vector<index_diameter_t>& columns_to_reduce,
-                         entry_hash_map previous_pivots) {
+                         entry_hash_map& previous_pivots) {
 	union_find dset(ripser.n);
 	edges = get_edges(ripser);
-	std::sort(edges.rbegin(), edges.rend(), reverse_filtration_order);
+	std::sort(edges.begin(), edges.end(), filtration_order);
 	std::vector<index_t> vertices_of_edge(2);
 	for(index_diameter_t e : edges) {
 		ripser.get_simplex_vertices(get_index(e), 1, ripser.n, vertices_of_edge);
 		index_t u = dset.find(vertices_of_edge[0]);
 		index_t v = dset.find(vertices_of_edge[1]);
 		if(u != v) {
+			// Zero-persistence check
 			if(get_diameter(e) != 0) {
 				ripser.barcodes.at(0).add_interval(0, get_diameter(e));
 			}
+			// Since this edge unions two components it kills a 0-cycle
+			// and is thus a pivot in the coboundary matrix
+			// We don't know to which column index this pivot corresponds but
+			// this information is never used and thus we use value=0 as a dummy
+			previous_pivots.insert(std::make_pair(get_index(e), 0));
 			dset.link(u, v);
-		} else {
-			columns_to_reduce.push_back(e);
 		}
+		columns_to_reduce.push_back(e);
 	}
+	// We need the columns_to_reduce in reverse_filtration_order for the
+	// reduction algorithm
 	std::reverse(columns_to_reduce.begin(), columns_to_reduce.end());
 	for(index_t i = 0; i < ripser.n; ++i) {
+		// Essential index
 		if(dset.find(i) == i) {
 			ripser.barcodes.at(0).add_interval(0, INF);
 		}
@@ -151,27 +159,26 @@ void compute_pairs(ripser &ripser,
 void compute_barcodes(ripser& ripser) {
 	ripser.barcodes.clear();
 	std::vector<index_diameter_t> simplices;
+	std::vector<index_diameter_t> columns_to_reduce;
 	entry_hash_map pivot_column_index;
 	entry_hash_map previous_pivots;
-	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
+	// Computes the dim=0 pairs and does the job of assemble_columns_to_reduce
+	// for dim=1
+	ripser.barcodes.push_back(barcode(0));
+	compute_dim_0_pairs(ripser, simplices, columns_to_reduce, previous_pivots);
+	// Run the reduction algorithm for all other dimensions
+	for(index_t dim = 1; dim <= ripser.dim_max; ++dim) {
 		ripser.barcodes.push_back(barcode(dim));
-		std::vector<index_diameter_t> columns_to_reduce;
-		if(dim == 0) {
-			// Computes the dim=0 pairs and does the job of assemble_columns_to_reduce
-			// for dim=1
-			compute_dim_0_pairs(ripser, simplices, columns_to_reduce, previous_pivots);
-		} else {
-			pivot_column_index.clear();
-			pivot_column_index.reserve(columns_to_reduce.size());
-			compute_pairs(ripser,
-			              columns_to_reduce,
-			              pivot_column_index,
-			              previous_pivots,
-			              dim);
-			previous_pivots.swap(pivot_column_index);
-			if(dim < ripser.dim_max) {
-				assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim + 1);
-			}
+		pivot_column_index.clear();
+		pivot_column_index.reserve(columns_to_reduce.size());
+		compute_pairs(ripser,
+					  columns_to_reduce,
+					  pivot_column_index,
+					  previous_pivots,
+					  dim);
+		previous_pivots.swap(pivot_column_index);
+		if(dim < ripser.dim_max) {
+			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim + 1);
 		}
 	}
 }
