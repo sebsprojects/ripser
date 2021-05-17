@@ -614,7 +614,7 @@ std::vector<index_diameter_t> get_edges(ripser& ripser) {
 		value_t length = ripser.dist(vertices[0], vertices[1]);
 		// Threshold check
 		if(length <= ripser.threshold) {
-			edges.push_back({length, index});
+			edges.push_back(std::make_pair(index, length));
 		}
 	}
 	return edges;
@@ -652,6 +652,5 @@ value_t compute_enclosing_radius(DistanceMatrix& dist) {
 			  << std::endl;
 	return enclosing_radius;
 }
-
 
 #endif

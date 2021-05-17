@@ -6,6 +6,7 @@ The current version of Ripser includes a large number of optimizations and featu
 
 In this repository the original code is restructured, simplified and feature-reduced in the interest of education. More specifically:
 - Restructured source code separate core functions and data types (in [ripser\_core.hpp](./ripser_core.hpp)) from specific implementations of the reduction algorithm
+- Moved all functionality regarding the reduction algorithm out of the `ripser` class and pass the `ripser` object to functions instead
 - Simplified types and only a bare minimum of templates
 - Many added comments
 - Implementation of persistent homology and cohomology **without** optimizations
@@ -26,10 +27,10 @@ Despite the numerous structural changes, this version is in close correspondence
 
 The original Ripser code is split into three types of files.
 
-### 1. Core Functionality: ripser\_core
+### 1. Core Functionality: ripser\_core.hpp
 
 [ripser\_core.hpp](./ripser_core.hpp) contains infrastructure code that is used for all versions of the reduction algorithm. It contains
-- The definition of most data types including the `ripser` class and `[co]boundary_enumerator`
+- The definition of most data types including the `ripser` class and `(co)boundary_enumerator`
 - All functionality regarding the binomial numbering system
 - All functionality regarding the enumeration of (co)faces
 - The implementation of all basic matrix operations used in the reduction algorithm (column addition, pivot extraction)
@@ -48,6 +49,7 @@ The following implementations are currently available:
 - Basic homology (in decreasing dimension)
 - Basic cohomology (in increasing dimension)
 - (Co)homology with clearing
+- Cohomology with the dim=0 union-find optimization
 - Cohomology with the emergent pairs optimization
 - Cohomology with the apparent pairs optimization
 
