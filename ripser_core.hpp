@@ -190,12 +190,56 @@ struct compressed_sparse_matrix {
 	}
 };
 
+std::vector<std::vector<value_t>> read_point_cloud(std::istream& input_stream) {
+	std::vector<std::vector<value_t>> points;
+	std::string line;
+	value_t value;
+	while (std::getline(input_stream, line)) {
+		std::vector<value_t> point;
+		std::istringstream s(line);
+		while (s >> value) {
+			point.push_back(value);
+			s.ignore();
+		}
+		if(!point.empty()) {
+			points.push_back(point);
+		}
+		assert(point.size() == points.front().size());
+	}
+	// Data will automatically get std::moved in C++11
+	// cf. https://stackoverflow.com/questions/15704565
+	return points;
+}
+
 compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_stream) {
 	std::vector<value_t> distances;
 	value_t value;
 	while (input_stream >> value) {
 		distances.push_back(value);
 		input_stream.ignore();
+	}
+	return compressed_lower_distance_matrix(std::move(distances));
+}
+
+struct diff_squared {
+	value_t operator()(value_t u, value_t v) {
+		return (u - v) * (u - v);
+	}
+};
+
+compressed_lower_distance_matrix read_lower_distance_matrix_from_point_cloud(std::istream& input_stream) {
+	std::vector<std::vector<value_t>> points = read_point_cloud(input_stream);
+	std::vector<value_t> distances;
+	for(size_t i = 0; i < points.size(); i++) {
+		for(size_t j = 0; j < i; j++) {
+			value_t d = std::sqrt(std::inner_product(points.at(i).begin(),
+			                                         points.at(i).end(),
+			                                         points.at(j).begin(),
+			                                         0,
+			                                         std::plus<value_t>(),
+			                                         diff_squared()));
+			distances.push_back(d);
+		}
 	}
 	return compressed_lower_distance_matrix(std::move(distances));
 }
