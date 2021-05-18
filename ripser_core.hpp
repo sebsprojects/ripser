@@ -622,6 +622,56 @@ std::vector<index_diameter_t> get_edges(ripser& ripser) {
 
 
 /* **************************************************************************
+ * Apparent Pairs
+ * *************************************************************************/
+
+index_diameter_t get_zero_pivot_facet(ripser& ripser, index_diameter_t simplex, index_t dim) {
+	simplex_boundary_enumerator facets(ripser);
+	facets.set_simplex(simplex, dim);
+	while(facets.has_next()) {
+		index_diameter_t facet = facets.next();
+		if(get_diameter(facet) == get_diameter(simplex)) {
+			return facet;
+		}
+	}
+	return index_diameter_t(-1, 0);
+}
+
+index_diameter_t get_zero_pivot_cofacet(ripser& ripser, index_diameter_t simplex, index_t dim) {
+	simplex_coboundary_enumerator cofacets(ripser);
+	cofacets.set_simplex(simplex, dim);
+	while(cofacets.has_next()) {
+		index_diameter_t cofacet = cofacets.next();
+		if(get_diameter(cofacet) == get_diameter(simplex)) {
+			return cofacet;
+		}
+	}
+	return index_diameter_t(-1, 0);
+}
+
+index_diameter_t get_zero_apparent_facet(ripser& ripser, index_diameter_t simplex, index_t dim) {
+	index_diameter_t facet = get_zero_pivot_facet(ripser, simplex, dim);
+	return ((get_index(facet) != -1) &&
+	        (get_index(get_zero_pivot_cofacet(ripser, facet, dim - 1)) == get_index(simplex)))
+	           ? facet
+	           : index_diameter_t(-1, 0);
+}
+
+index_diameter_t get_zero_apparent_cofacet(ripser& ripser, index_diameter_t simplex, index_t dim) {
+	index_diameter_t cofacet = get_zero_pivot_cofacet(ripser, simplex, dim);
+	return ((get_index(cofacet) != -1) &&
+	        (get_index(get_zero_pivot_facet(ripser, cofacet, dim + 1)) == get_index(simplex)))
+	           ? cofacet
+	           : index_diameter_t(-1, 0);
+}
+
+bool is_in_zero_apparent_pair(ripser& ripser, index_diameter_t simplex, index_t dim) {
+	return (get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1) ||
+	       (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1);
+}
+
+
+/* **************************************************************************
  * Other
  * *************************************************************************/
 

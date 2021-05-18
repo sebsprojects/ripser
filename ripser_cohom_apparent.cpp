@@ -45,7 +45,10 @@ void assemble_columns_to_reduce(ripser &ripser,
 			// Threshold check
 			if(get_diameter(cofacet) <= ripser.threshold) {
 				next_simplices.push_back(cofacet);
-				columns_to_reduce.push_back(cofacet);
+				// Apparent Pair check
+				if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
+					columns_to_reduce.push_back(cofacet);
+				}
 			}
 		}
 	}
@@ -139,6 +142,7 @@ void compute_barcodes(ripser& ripser) {
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
 		compute_pairs(ripser, columns_to_reduce, pivot_column_index, previous_pivots, dim);
+		//TODO(seb): reserve enough space in previous_pivots?
 		previous_pivots.swap(pivot_column_index);
 	}
 }
