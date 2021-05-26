@@ -234,32 +234,40 @@ typedef std::unordered_map<index_t,
  * Ripser
  * *************************************************************************/
 
+struct homology_class {
+	value_t birth;
+	value_t death;
+	std::vector<index_t> representative;
+
+	homology_class(value_t _birth, value_t _death, std::vector<index_t> rep)
+		: birth(_birth),
+		  death(_death),
+		  representative(rep)
+	{ }
+};
+
 struct barcode {
 	index_t dim;
-	std::vector<std::pair<value_t, value_t>> persistence_intervals;
+	std::vector<homology_class> hom_classes;
 	size_t clearing_count;
 	size_t emergent_count;
 	size_t apparent_count;
 
 	barcode(index_t _dim)
-		: dim(_dim), persistence_intervals(),
+		: dim(_dim),
+		  hom_classes(),
 		  clearing_count(0),
 		  emergent_count(0),
 		  apparent_count(0)
 	{ }
-
-	void add_interval(value_t birth, value_t death) {
-		persistence_intervals.push_back(std::make_pair(birth, death));
-	}
 };
 
 bool barcode_order(const barcode& a, const barcode& b) {
 	return a.dim < b.dim;
 }
 
-bool persistence_interval_order(std::pair<value_t, value_t>& a,
-                                std::pair<value_t, value_t>& b) {
-	return (a.first < b.first) || (a.first == b.first && a.second < b.second);
+bool homology_class_order(homology_class& a, homology_class& b) {
+	return (a.birth < b.birth) || (a.birth == b.birth && a.death < b.death );
 }
 
 struct ripser {
@@ -279,7 +287,11 @@ struct ripser {
 		  dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
 		  threshold(_threshold), ratio(_ratio),
 		  binomial_coeff(n, dim_max + 2)
-	{ }
+	{
+		for(size_t i = 0; i <= dim_max; ++i) {
+			barcodes.push_back(barcode(i));
+		}
+	}
 	
 	// For a k-simplex idx, return the vertex (of idx) of maximal index
 	// n is an upper bound for the search
@@ -326,6 +338,10 @@ struct ripser {
 				diam = std::max(diam, dist(vertices[i], vertices[j]));
 			}
 		return diam;
+	}
+
+	void add_hom_class(index_t dim, value_t birth, value_t death, std::vector<index_t> rep) {
+		barcodes.at(dim).hom_classes.push_back(homology_class(birth, death, rep));
 	}
 };
 
