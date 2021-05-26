@@ -227,20 +227,26 @@ struct diff_squared {
 	}
 };
 
-compressed_lower_distance_matrix read_lower_distance_matrix_from_point_cloud(std::istream& input_stream) {
-	std::vector<std::vector<value_t>> points = read_point_cloud(input_stream);
+std::vector<value_t> point_cloud_to_distance_vector(std::vector<std::vector<value_t>>& points) {
 	std::vector<value_t> distances;
 	for(size_t i = 0; i < points.size(); i++) {
 		for(size_t j = 0; j < i; j++) {
 			value_t d = std::sqrt(std::inner_product(points.at(i).begin(),
 			                                         points.at(i).end(),
 			                                         points.at(j).begin(),
-			                                         0,
+			                                         0.0,
 			                                         std::plus<value_t>(),
 			                                         diff_squared()));
 			distances.push_back(d);
+			std::cout << d << std::endl;
 		}
 	}
+	return distances;
+}
+
+compressed_lower_distance_matrix read_lower_distance_matrix_from_point_cloud(std::istream& input_stream) {
+	std::vector<std::vector<value_t>> points = read_point_cloud(input_stream);
+	std::vector<value_t> distances = point_cloud_to_distance_vector(points);
 	return compressed_lower_distance_matrix(std::move(distances));
 }
 
@@ -309,6 +315,8 @@ bool persistence_interval_order(std::pair<value_t, value_t>& a,
 struct ripser {
 
 	const DistanceMatrix dist;
+	// The count of points in the relative part
+	const index_t rel_count;
 	const index_t n;
 	const index_t dim_max;
 	const value_t threshold;
@@ -318,8 +326,9 @@ struct ripser {
 	// Output
 	mutable std::vector<barcode> barcodes;
 
-	ripser(DistanceMatrix&& _dist, index_t _dim_max, value_t _threshold, float _ratio)
-		: dist(std::move(_dist)), n(dist.size()),
+	ripser(DistanceMatrix&& _dist, index_t _rel_count, index_t _dim_max,
+	       value_t _threshold, float _ratio)
+		: dist(std::move(_dist)), rel_count(_rel_count), n(dist.size()),
 		  dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
 		  threshold(_threshold), ratio(_ratio),
 		  binomial_coeff(n, dim_max + 2)

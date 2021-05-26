@@ -124,7 +124,9 @@ void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
 	entry_hash_map previous_pivots;
-	for(index_t i = 0; i < ripser.n; i++) {
+	// The relative part of the complex is induced by vertices [0, rel_count)
+	// Here we just the complement of that set
+	for(index_t i = ripser.rel_count; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
 	}
@@ -149,25 +151,44 @@ void compute_barcodes(ripser& ripser) {
  * *************************************************************************/
 
 int main(int argc, char** argv) {
-	const char* filename = nullptr;
-	if(argc == 2) {
-		filename = argv[1];
+	const char* file_all_points = nullptr;
+	const char* file_rel_points = nullptr;
+	if(argc == 3) {
+		file_all_points = argv[1];
+		file_rel_points = argv[2];
 	} else {
-		std::cerr << "error: specify path to lower-distance matrix file as only arg"
+		std::cerr << "error: specify two point-cloud files for relative cohomology"
 				  << std::endl;
 		exit(-1);
 	}
-	// Reading the distance matrix from file
-	std::ifstream file_stream(filename);
-	if (filename && file_stream.fail()) {
-		std::cerr << "error: couldn't open file " << filename << std::endl;
+	// Reading the point cloud from file
+	std::ifstream file_stream_all(file_all_points);
+	std::ifstream file_stream_rel(file_rel_points);
+	if ((file_all_points && file_stream_all.fail()) ||
+	    (file_rel_points && file_stream_rel.fail())) {
+		std::cerr << "error: couldn't open file(s)" << std::endl;
 		exit(-1);
 	}
-	DistanceMatrix dist = read_lower_distance_matrix(file_stream);
+	// Read the point clouds
+	std::vector<std::vector<value_t>> all_points = read_point_cloud(file_stream_all);
+	std::vector<std::vector<value_t>> rel_points = read_point_cloud(file_stream_rel);
+	std::vector<std::vector<value_t>> points = rel_points;
+	points.reserve(all_points.size());
+	// Push all non-rel points of all_points into the new vector points
+	for(size_t i = 0; i < all_points.size(); i++) {
+		if(std::find(rel_points.begin(), rel_points.end(), all_points.at(i)) == rel_points.end()) {
+			points.push_back(all_points.at(i));
+		}
+	}
+	for(auto v : points) {
+		std::cout << v.at(0) << "," << v.at(1) << std::endl;
+	}
+	DistanceMatrix dist = compressed_lower_distance_matrix(point_cloud_to_distance_vector(points));
 	value_t enclosing_radius = compute_enclosing_radius(dist);
+	std::cout << "Enclosing radius: " << enclosing_radius << std::endl;
 	index_t dim_max = 1;
 	float ratio = 1;
-	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
+	ripser ripser(std::move(dist), rel_points.size(), dim_max, enclosing_radius, ratio);
 	list_all_simplices(ripser);
 	compute_barcodes(ripser);
 	print_barcodes(ripser.barcodes);
