@@ -109,26 +109,24 @@ void compute_cohomology(ripser &ripser,
 				break;
 			}
 		}
-		// Write V_j to V
+		// Write V_j to V and store it
 		index_diameter_t e = pop_pivot(working_reduction_column);
 		while(get_index(e) != -1) {
 			reduction_matrix.push_back(e);
 			e = pop_pivot(working_reduction_column);
 		}
 		// Determine Persistence Pair
-		value_t birth = get_diameter(column_to_reduce);
 		if(get_index(pivot) != -1) {
-			value_t death = get_diameter(pivot);
-			if(death > birth * ripser.ratio) {
-				// Non-essential pair
-				//ripser.barcodes.at(dim).add_interval(birth, death);
-			}
+			// Non-essential pair. Get's ignored for output here
 		} else {
-			// Zero column
-			//ripser.barcodes.at(dim).add_interval(birth, INF);
+			// Essential index (since clearing)
+			value_t birth = get_diameter(column_to_reduce);
+			ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
 		}
 	}
 }
+
+// dim corresponds to the dim of simplices in columns_to_reduce
 void compute_homology(ripser &ripser,
                       const std::vector<index_diameter_t>& columns_to_reduce,
                       entry_hash_map& pivot_column_index,
@@ -142,7 +140,7 @@ void compute_homology(ripser &ripser,
 		index_diameter_t column_to_reduce = columns_to_reduce.at(j);
 		index_diameter_t pivot = hom_init_boundary_and_get_pivot(ripser,
 		                                                         column_to_reduce,
-		                                                         dim + 1,
+		                                                         dim,
 		                                                         working_boundary);
 		// The reduction
 		while(get_index(pivot) != -1) {
@@ -153,7 +151,7 @@ void compute_homology(ripser &ripser,
 				             reduction_matrix,
 				             columns_to_reduce,
 				             index_column_to_add,
-				             dim + 1,
+				             dim,
 				             working_reduction_column,
 				             working_boundary);
 				pivot = get_pivot(working_boundary);
@@ -162,7 +160,6 @@ void compute_homology(ripser &ripser,
 				break;
 			}
 		}
-		print_column(ripser, working_boundary, 1);
 		// Write V_j to V
 		index_diameter_t e = pop_pivot(working_reduction_column);
 		while(get_index(e) != -1) {
@@ -179,61 +176,57 @@ void compute_homology(ripser &ripser,
 				while(!working_boundary.empty()) {
 					rep.push_back(get_index(pop_pivot(working_boundary)));
 				}
-				ripser.add_hom_class(dim, birth, death, rep);
+				ripser.add_hom_class(dim - 1, birth, death, rep);
 			}
 		} else {
-			// Zero column
-			value_t birth = get_diameter(column_to_reduce);
-			if(dim == 1 && birth == -INF) {
-				birth = 0;
-			}
-			//std::cout << "[" << birth << ", )" << std::endl;
+			// This case will not occur since we only do the reduction
+			// for known non-essential pairs
+			assert(false);
 		}
 	}
 }
 
 void compute_barcodes(ripser& ripser) {
-	std::vector<index_diameter_t> simplices;
-	entry_hash_map pivot_column_index;
 	// Init 0-simplices
+	std::vector<index_diameter_t> simplices;
 	for(index_t i = 0; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
 	}
-	index_t dim;
-	std::vector<index_diameter_t> columns_to_reduce;
-	// dim=0 cohomology (gets discarded)
-	dim = 0;
-	columns_to_reduce = std::vector<index_diameter_t>(simplices);
-	compute_cohomology(ripser, columns_to_reduce, pivot_column_index, dim);
-	// TODO: dim=0 homology
-	// dim=1 cohomology
-	dim = 1;
-	pivot_column_index.clear();
-	pivot_column_index.reserve(columns_to_reduce.size());
-	assemble_columns_to_reduce(ripser, simplices, columns_to_reduce,
-	                           pivot_column_index, dim);
-	compute_cohomology(ripser, columns_to_reduce, pivot_column_index, dim);
-	// get pairs from the cohomology computation
+	std::vector<index_diameter_t> columns_to_reduce(simplices);
 	std::vector<index_diameter_t> boundary_columns_to_reduce;
-	for(auto it = pivot_column_index.begin(); it != pivot_column_index.end(); ++it) {
-		auto pair = *it;
-		index_t pivot_row_index = pair.first;
-		value_t pivot_row_diam = ripser.compute_diameter(pivot_row_index, dim + 1);
-		boundary_columns_to_reduce.push_back(std::make_pair(pivot_row_index,
-		                                                    pivot_row_diam));
-
-	}
-	std::sort(boundary_columns_to_reduce.begin(), boundary_columns_to_reduce.end(),
-	          filtration_order);
-	//for(index_diameter_t i : boundary_columns_to_reduce) {
-	//	std::cout << get_index(i) << " ";
-	//}
-	//std::cout << std::endl;
-	// dim=1 homology
+	entry_hash_map pivot_column_index;
 	entry_hash_map boundary_pivot_column_index;
-	boundary_pivot_column_index.reserve(boundary_columns_to_reduce.size());
-	compute_homology(ripser, boundary_columns_to_reduce, boundary_pivot_column_index, dim);
+	// cohom in dim=0
+	compute_cohomology(ripser, columns_to_reduce, pivot_column_index, 0);
+	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
+		// collect columns for homology
+		boundary_columns_to_reduce.clear();
+		for(auto it = pivot_column_index.begin(); it != pivot_column_index.end(); ++it) {
+			auto pair = *it;
+			index_t pivot_row_index = pair.first;
+			value_t pivot_row_diam = ripser.compute_diameter(pivot_row_index, dim + 1);
+			boundary_columns_to_reduce.push_back(std::make_pair(pivot_row_index,
+			                                     pivot_row_diam));
+		}
+		std::sort(boundary_columns_to_reduce.begin(), boundary_columns_to_reduce.end(),
+		          filtration_order);
+		// compute homology in dim
+		boundary_pivot_column_index.clear();
+		boundary_pivot_column_index.reserve(boundary_columns_to_reduce.size());
+		compute_homology(ripser,
+		                 boundary_columns_to_reduce,
+		                 boundary_pivot_column_index,
+		                 dim + 1);
+		// compute cohomology in dim+1
+		if(dim < ripser.dim_max) {
+			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce,
+	                                   pivot_column_index, dim + 1);
+			pivot_column_index.clear();
+			pivot_column_index.reserve(columns_to_reduce.size());
+			compute_cohomology(ripser, columns_to_reduce, pivot_column_index, dim + 1);
+		}
+	}
 }
 
 
@@ -261,7 +254,7 @@ int main(int argc, char** argv) {
 	index_t dim_max = 1;
 	float ratio = 1;
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
-	list_all_simplices(ripser);
+	//list_all_simplices(ripser);
 	compute_barcodes(ripser);
 	print_barcodes(ripser, false);
 	exit(0);
