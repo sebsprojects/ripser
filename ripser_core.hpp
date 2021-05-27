@@ -286,7 +286,8 @@ struct ripser {
 		: dist(std::move(_dist)), n(dist.size()),
 		  dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
 		  threshold(_threshold), ratio(_ratio),
-		  binomial_coeff(n, dim_max + 2)
+		  binomial_coeff(n, dim_max + 2),
+		  barcodes(std::vector<barcode>())
 	{
 		for(size_t i = 0; i <= dim_max; ++i) {
 			barcodes.push_back(barcode(i));

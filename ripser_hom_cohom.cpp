@@ -109,7 +109,7 @@ void compute_cohomology(ripser &ripser,
 				break;
 			}
 		}
-		// Write V_j to V and store it
+		// Write V_j to V
 		index_diameter_t e = pop_pivot(working_reduction_column);
 		while(get_index(e) != -1) {
 			reduction_matrix.push_back(e);

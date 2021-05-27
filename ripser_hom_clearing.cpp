@@ -117,7 +117,11 @@ void compute_pairs(ripser &ripser,
 			value_t birth = get_diameter(pivot);
 			value_t death = get_diameter(column_to_reduce);
 			if(death > birth * ripser.ratio) {
-				ripser.barcodes.at(ripser.dim_max - dim + 1).add_interval(birth, death);
+				std::vector<index_t> rep;
+				while(!working_boundary.empty()) {
+					rep.push_back(get_index(pop_pivot(working_boundary)));
+				}
+				ripser.add_hom_class(dim - 1, birth, death, rep);
 			}
 		} else {
 			// Zero column
@@ -134,14 +138,13 @@ void compute_pairs(ripser &ripser,
 			// Thus this clause
 			if(dim <= ripser.dim_max) {
 				// Essential birth index (birth in dimension dim)
-				ripser.barcodes.at(ripser.dim_max - dim).add_interval(birth, INF);
+				ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
 			}
 		}
 	}
 }
 
 void compute_barcodes(ripser& ripser) {
-	ripser.barcodes.clear();
 	std::vector<index_diameter_t> previous_simplices;
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
@@ -168,12 +171,7 @@ void compute_barcodes(ripser& ripser) {
 		}
 		std::sort(simplices.begin(), simplices.end(), filtration_order);
 	}
-	ripser.barcodes.push_back(barcode(ripser.dim_max));
 	for(index_t dim = ripser.dim_max + 1; dim >= 0; --dim) {
-		// We need the barcode of dim-1 already in dim
-		if(dim > 0 && dim <= ripser.dim_max) {
-			ripser.barcodes.push_back(barcode(dim - 1));
-		}
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == ripser.dim_max + 1) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
@@ -212,8 +210,8 @@ int main(int argc, char** argv) {
 	index_t dim_max = 1;
 	float ratio = 1;
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
-	list_all_simplices(ripser);
+	//list_all_simplices(ripser);
 	compute_barcodes(ripser);
-	print_barcodes(ripser.barcodes, true);
+	print_barcodes(ripser, false);
 	exit(0);
 }
