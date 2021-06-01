@@ -72,10 +72,10 @@ int sprint_simplex(char *buf, ripser& ripser, index_t simplex, index_t dim) {
 	std::vector<index_t> vertices(ripser.n, -1);
 	ripser.get_simplex_vertices(simplex, dim, ripser.n, vertices);
 	int offs = 0;
-	offs += sprintf(offs + buf, "%i-", simplex);
+	offs += sprintf(offs + buf, "%li-", simplex);
 	for(auto v : vertices) {
 	  if(v == -1) continue;
-	  offs += sprintf(offs + buf, "%i'", v);
+	  offs += sprintf(offs + buf, "%li'", v);
 	}
 	return offs;
 }
@@ -105,14 +105,14 @@ void print_v(compressed_sparse_matrix& v,
 	char buf[1024]; buf[0] = '\0';
 	int offs = 0;
 	int pad = 3;
-	for(size_t row = 0; row < columns_to_reduce.size(); ++row) {
+	for(index_t row = 0; row < (index_t) columns_to_reduce.size(); ++row) {
 		index_t row_ele = get_index(columns_to_reduce.at(row));
-		for(size_t col = 0; col < columns_to_reduce.size(); ++col) {
+		for(index_t col = 0; col < (index_t) columns_to_reduce.size(); ++col) {
 			if(col >= v.size()) {
 				offs += sprint_pad(buf + offs, pad);
 			} else {
-				size_t count = 0;
-				for(size_t i = v.column_start(col); i < v.column_end(col); ++i) {
+				index_t count = 0;
+				for(index_t i = v.column_start(col); i < v.column_end(col); ++i) {
 					if(get_index(v.get_entry(i)) == row_ele) {
 						count++;
 					}
@@ -133,8 +133,8 @@ void print_mat(compressed_sparse_matrix& mat) {
 	char buf[1024]; buf[0] = '\0';
 	int offs = 0;
 	int pad = 3;
-	size_t max_row_index = 0;
-	for(size_t i = 0; i < mat.size(); ++i) {
+	index_t max_row_index = 0;
+	for(index_t i = 0; i < mat.size(); ++i) {
 		max_row_index = std::max(max_row_index,
 		                         mat.column_end(i) - mat.column_start(i));
 	}
@@ -146,8 +146,8 @@ void print_mat(compressed_sparse_matrix& mat) {
 //		std::cout << get_index(e) << " ";
 //	}
 	std::cout << std::endl;
-	for(size_t row = 0; row < max_row_index; ++row) {
-		for(size_t col = 0; col < mat.size(); ++col) {
+	for(index_t row = 0; row < max_row_index; ++row) {
+		for(index_t col = 0; col < mat.size(); ++col) {
 			if(row < mat.column_end(col) - mat.column_start(col)) {
 				index_t ele = get_index(mat.get_entry(row, col));
 				offs += sprint_element(offs + buf, ele, pad);

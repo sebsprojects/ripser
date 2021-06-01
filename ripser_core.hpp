@@ -142,32 +142,32 @@ typedef struct compressed_lower_distance_matrix DistanceMatrix;
 
 struct compressed_sparse_matrix {
 
-	std::vector<size_t> bounds;
+	std::vector<index_t> bounds;
 	std::vector<index_diameter_t> entries;
 
 	compressed_sparse_matrix() {}
 
-	size_t column_start(const index_t index) const {
+	index_t column_start(const index_t index) const {
 		return index == 0 ? 0 : bounds.at(index - 1);
 	}
 
-	size_t column_end(const index_t index) const {
+	index_t column_end(const index_t index) const {
 		return bounds.at(index);
 	}
 
-	index_diameter_t get_entry(const size_t index) {
+	index_diameter_t get_entry(const index_t index) {
 		return entries.at(index);
 	}
 
-	index_diameter_t get_entry(const size_t row_index, const size_t col_index) {
+	index_diameter_t get_entry(const index_t row_index, const index_t col_index) {
 		return entries.at(column_start(col_index) + row_index);
 	}
 
-	bool has_entry_at(const size_t row_index, const size_t col_index) {
-		if(bounds.size() <= col_index) {
+	bool has_entry_at(const index_t row_index, const index_t col_index) {
+		if(size() <= col_index) {
 			return false;
 		}
-		for(size_t i = column_start(col_index); i < column_end(col_index); ++i) {
+		for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
 			if(get_index(entries.at(i)) == row_index) {
 				return true;
 			}
@@ -175,8 +175,20 @@ struct compressed_sparse_matrix {
 		return false;
 	}
 
-	size_t size() const {
-		return bounds.size();
+	bool search_column(const index_t col_index, index_t idx) {
+		assert(col_index < size());
+		for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
+			if(get_index(get_entry(i)) == idx) {
+				return true;
+			}
+			// TODO: Add break condition that uses the fact that the column (row)
+			// is ordered
+		}
+		return false;
+	}
+
+	index_t size() const {
+		return (index_t) bounds.size();
 	}
 
 	void append_column() {
@@ -289,7 +301,7 @@ struct ripser {
 		  binomial_coeff(n, dim_max + 2),
 		  barcodes(std::vector<barcode>())
 	{
-		for(size_t i = 0; i <= dim_max; ++i) {
+		for(index_t i = 0; i <= dim_max; ++i) {
 			barcodes.push_back(barcode(i));
 		}
 	}
@@ -526,7 +538,7 @@ void add_coboundary(ripser& ripser,
 	                       working_reduction_column,
 	                       working_coboundary);
 	// Computation of R_j due to implicit reduction
-	for(size_t i = reduction_matrix.column_start(index_column_to_add);
+	for(index_t i = reduction_matrix.column_start(index_column_to_add);
 	    i < reduction_matrix.column_end(index_column_to_add);
 	    ++i) {
 		index_diameter_t simplex = reduction_matrix.get_entry(i);
