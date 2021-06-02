@@ -8,6 +8,9 @@ ripser_cohom: ripser_cohom.cpp
 ripser_cohom_rep: ripser_cohom_rep.cpp
 	c++ -std=c++11 -Wall ripser_cohom_rep.cpp -o ripser_cohom_rep -g
 
+ripser_cohom_rep_row: ripser_cohom_rep_row.cpp
+	c++ -std=c++11 -Wall ripser_cohom_rep_row.cpp -o ripser_cohom_rep_row -g
+
 ripser_cohom_clearing: ripser_cohom_clearing.cpp
 	c++ -std=c++11 -Wall ripser_cohom_clearing.cpp -o ripser_cohom_clearing -g
 
@@ -33,4 +36,4 @@ ripser_hom_cohom: ripser_hom_cohom.cpp
 	c++ -std=c++11 -Wall ripser_hom_cohom.cpp -o ripser_hom_cohom -g
 
 clean:
-	rm -f ripser_cohom ripser_cohom_clearing ripser_cohom_unionfind ripser_cohom_emergent ripser_cohom_apprent ripser_hom ripser_hom_clearing ripser_hom_cohom ripser_cohom_rep
+	rm -f ripser_cohom ripser_cohom_clearing ripser_cohom_unionfind ripser_cohom_emergent ripser_cohom_apprent ripser_hom ripser_hom_clearing ripser_hom_cohom ripser_cohom_rep ripser_cohom_rep_row
