@@ -61,7 +61,8 @@ void compute_pairs(ripser &ripser,
                    const index_t dim) {
 	compressed_sparse_matrix reduction_matrix; // V
 	compressed_sparse_matrix v_inv;
-	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+	std::vector<index_t> nonessential_red;
+	for(index_t j = 0; j < (index_t) columns_to_reduce.size(); ++j) { // For j in J
 		Column working_reduction_column; // V_j
 		Column working_coboundary;       // R_j
 		// Assemble the column j (corresponding to the simplex column_to_reduce)
@@ -69,7 +70,7 @@ void compute_pairs(ripser &ripser,
 		index_diameter_t column_to_reduce = columns_to_reduce.at(j);
 		index_diameter_t pivot = init_coboundary_and_get_pivot(ripser,
 		                                                       column_to_reduce,
-		                                                       dim,
+                                                                         dim,
 		                                                       working_coboundary);
 		// The reduction
 		// The loop terminates on either of two conditions
@@ -107,38 +108,48 @@ void compute_pairs(ripser &ripser,
 			index_t sum = 0;
 			for(index_t i = reduction_matrix.column_end(j) - 1;
 			    i >= reduction_matrix.column_start(j);
-			    --i) {
+			    --i)
+			{
 				index_diameter_t v_ij = reduction_matrix.get_entry(i);
 				sum += v_inv.search_column(k, get_index(v_ij));
 			}
 			if(sum % 2 == 1) {
-				v_inv.push_back(columns_to_reduce.at(k));
+				v_inv.push_at(k, column_to_reduce);
 			}
 		}
-		std::cout << std::endl;
+		//print_mat_simplices(ripser, v_inv, dim);
 		// Determine Persistence Pair
 		value_t birth = get_diameter(column_to_reduce);
 		if(get_index(pivot) != -1) {
 			value_t death = get_diameter(pivot);
 			if(death > birth * ripser.ratio) {
 				// Non-essential pair
-				//ripser.barcodes.at(dim).add_interval(birth, death);
+				ripser.add_hom_class(dim, birth, death, std::vector<index_t>());
+				nonessential_red.push_back(j);
 			}
 		} else {
 			// Zero column
 			auto pair = previous_pivots.find(get_index(column_to_reduce));
 			if(pair == previous_pivots.end()) {
 				// Essential index!
-				//ripser.barcodes.at(dim).add_interval(birth, INF);
+				ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
 			} else {
 				// Killing index non-essential pair
 			}
 		}
 	}
-	std::cout << std::endl << "V and V^-1: dim=" << dim << std::endl;
-	print_v(reduction_matrix, columns_to_reduce);
-	std::cout << std::endl;
-	print_v(v_inv, columns_to_reduce);
+	for(index_t i = 0; i < (index_t) nonessential_red.size(); i++) {
+		homology_class& h = ripser.barcodes.at(dim).hom_classes.at(i);
+		index_t row_index = nonessential_red.at(i);
+		for(index_t k = v_inv.column_start(row_index); k < v_inv.column_end(row_index); k++) {
+			h.representative.push_back(get_index(v_inv.get_entry(k)));
+		}
+	}
+	//std::cout << std::endl << "V and V^-1: dim=" << dim << std::endl;
+	//print_v(reduction_matrix, columns_to_reduce);
+	//std::cout << std::endl;
+	//print_mat_simplices(ripser, v_inv, dim);
+	//print_vrow(v_inv, columns_to_reduce);
 }
 
 void compute_barcodes(ripser& ripser) {
@@ -192,6 +203,6 @@ int main(int argc, char** argv) {
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
 	list_all_simplices(ripser);
 	compute_barcodes(ripser);
-	//print_barcodes(ripser.barcodes);
+	print_barcodes(ripser);
 	exit(0);
 }

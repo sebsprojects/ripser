@@ -108,25 +108,49 @@ void print_v(compressed_sparse_matrix& v,
 	for(index_t row = 0; row < (index_t) columns_to_reduce.size(); ++row) {
 		index_t row_ele = get_index(columns_to_reduce.at(row));
 		for(index_t col = 0; col < (index_t) columns_to_reduce.size(); ++col) {
-			if(col >= v.size()) {
-				offs += sprint_pad(buf + offs, pad);
+			if(v.search_column(col, row_ele)) {
+				offs += sprint_element(buf + offs, 1, pad);
 			} else {
-				index_t count = 0;
-				for(index_t i = v.column_start(col); i < v.column_end(col); ++i) {
-					if(get_index(v.get_entry(i)) == row_ele) {
-						count++;
-					}
-				}
-				if(count % 2 == 1) {
-					offs += sprint_element(buf + offs, 1, pad);
-				} else {
-					offs += sprint_pad(buf + offs, pad);
-				}
+				offs += sprint_pad(buf + offs, pad);
 			}
 		}
 		offs += sprintf(offs + buf, "\n");
 	}
 	printf("%s", buf);
+}
+
+void print_vrow(compressed_sparse_matrix& v,
+                std::vector<index_diameter_t> columns_to_reduce) {
+	char buf[1024]; buf[0] = '\0';
+	int offs = 0;
+	int pad = 3;
+	for(index_t row = 0; row < (index_t) columns_to_reduce.size(); ++row) {
+		for(index_t col = 0; col < (index_t) columns_to_reduce.size(); ++col) {
+			index_t col_ele = get_index(columns_to_reduce.at(col));
+			if(v.search_column(row, col_ele)) {
+				offs += sprint_element(buf + offs, 1, pad);
+			} else {
+				offs += sprint_pad(buf + offs, pad);
+			}
+		}
+		offs += sprintf(offs + buf, "\n");
+	}
+	printf("%s", buf);
+}
+
+void print_mat_simplices(ripser& ripser, compressed_sparse_matrix& v, index_t dim) {
+	//std::cout << "Bounds: ";
+	//for(auto b : v.bounds) {
+	//	std::cout << b << " ";
+	//}
+	std::cout << std::endl;
+	for(index_t i = 0; i < (index_t) v.entries.size(); i++) {
+		print_simplex(ripser, get_index(v.get_entry(i)), dim);
+		std::cout << " ";
+		if(std::find(v.bounds.begin(), v.bounds.end(), i + 1) != v.bounds.end()) {
+			std::cout << std::endl;
+		}
+	}
 }
 
 void print_mat(compressed_sparse_matrix& mat) {
@@ -138,13 +162,6 @@ void print_mat(compressed_sparse_matrix& mat) {
 		max_row_index = std::max(max_row_index,
 		                         mat.column_end(i) - mat.column_start(i));
 	}
-//	for(auto e : mat.bounds) {
-//		std::cout << e;
-//	}
-//	std::cout << std::endl;
-//	for(auto e : mat.entries) {
-//		std::cout << get_index(e) << " ";
-//	}
 	std::cout << std::endl;
 	for(index_t row = 0; row < max_row_index; ++row) {
 		for(index_t col = 0; col < mat.size(); ++col) {

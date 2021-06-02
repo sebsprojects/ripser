@@ -163,20 +163,7 @@ struct compressed_sparse_matrix {
 		return entries.at(column_start(col_index) + row_index);
 	}
 
-	bool has_entry_at(const index_t row_index, const index_t col_index) {
-		if(size() <= col_index) {
-			return false;
-		}
-		for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
-			if(get_index(entries.at(i)) == row_index) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	bool search_column(const index_t col_index, index_t idx) {
-		assert(col_index < size());
 		for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
 			if(get_index(get_entry(i)) == idx) {
 				return true;
@@ -199,6 +186,14 @@ struct compressed_sparse_matrix {
 		assert(size() >= 0);
 		entries.push_back(idx);
 		++bounds.back();
+	}
+
+	void push_at(const index_t col_index, index_diameter_t idx) {
+		// TODO: insert is very inefficient for std::vector
+		entries.insert(entries.begin() + column_end(col_index), idx);
+		for(index_t i = col_index; i < size(); i++) {
+			++bounds.at(i);
+		}
 	}
 };
 
