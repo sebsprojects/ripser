@@ -100,23 +100,23 @@ void compute_pairs(ripser &ripser,
 			reduction_matrix.push_back(e);
 			e = pop_pivot(working_reduction_column);
 		}
-		// Compute the new inverse of V and store it column-order
+		// Compute the new inverse of V and store it row-order
 		v_inv.append_column();
+		v_inv.push_back(column_to_reduce);
 		for(index_t k = 0; k < j; ++k) {
 			// Compute the inner product v_inv(k) * V_j
 			index_t sum = 0;
-			index_diameter_t row_simplex = columns_to_reduce.at(k);
-			for(index_t i = 0; i < v_inv.size(); ++i) {
-				if(v_inv.search_column(i, get_index(row_simplex))) {
-					index_t col_simplex = get_index(columns_to_reduce.at(i));
-					sum += reduction_matrix.search_column(j, col_simplex);
-				}
+			for(index_t i = reduction_matrix.column_start(j);
+			    i < reduction_matrix.column_end(j);
+			    ++i)
+			{
+				index_diameter_t v_ij = reduction_matrix.get_entry(i);
+				sum += v_inv.search_column(k, get_index(v_ij));
 			}
 			if(sum % 2 == 1) {
-				v_inv.push_back(row_simplex);
+				v_inv.push_at(k, column_to_reduce);
 			}
 		}
-		v_inv.push_back(column_to_reduce);
 		//print_mat_simplices(ripser, v_inv, dim);
 		// Determine Persistence Pair
 		value_t birth = get_diameter(column_to_reduce);
@@ -141,16 +141,11 @@ void compute_pairs(ripser &ripser,
 	}
 	// Assign the rows of v_inv correspoding to non-essential pairs to their
 	// respective homology class
-	for(index_t i = 0; i < (index_t) nonessential_red.size(); ++i) {
+	for(index_t i = 0; i < (index_t) nonessential_red.size(); i++) {
 		homology_class& h = ripser.barcodes.at(dim).hom_classes.at(nonessential_red.at(i).first);
 		index_t row_index = nonessential_red.at(i).second;
-		index_t row_simplex = get_index(columns_to_reduce.at(row_index));
-		// Go over all columns in v_inv and check if they contain row_simplex
-		// If yes, then add the column simplex to the representative
-		for(index_t k = 0; k < v_inv.size(); ++k) {
-			if(v_inv.search_column(k, row_simplex)) {
-				h.representative.push_back(get_index(columns_to_reduce.at(k)));
-			}
+		for(index_t k = v_inv.column_start(row_index); k < v_inv.column_end(row_index); k++) {
+			h.representative.push_back(get_index(v_inv.get_entry(k)));
 		}
 	}
 	//std::cout << std::endl << "V and V^-1: dim=" << dim << std::endl;
@@ -160,7 +155,7 @@ void compute_pairs(ripser &ripser,
 	if(dim == 0) {
 		print_v(reduction_matrix, columns_to_reduce);
 		std::cout << std::endl;
-		print_v(v_inv, columns_to_reduce);
+		print_vrow(v_inv, columns_to_reduce);
 	}
 }
 

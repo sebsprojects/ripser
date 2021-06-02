@@ -102,9 +102,11 @@ void print_column(ripser& ripser, Column &column, index_t dim) {
 
 void print_v(compressed_sparse_matrix& v,
              std::vector<index_diameter_t> columns_to_reduce) {
-	char buf[1024]; buf[0] = '\0';
 	int offs = 0;
 	int pad = 3;
+	char *buf = (char *) malloc(columns_to_reduce.size() * columns_to_reduce.size() *
+	                            2 * pad + columns_to_reduce.size() + 10000);
+	buf[0] = '\0';
 	for(index_t row = 0; row < (index_t) columns_to_reduce.size(); ++row) {
 		index_t row_ele = get_index(columns_to_reduce.at(row));
 		for(index_t col = 0; col < (index_t) columns_to_reduce.size(); ++col) {
@@ -117,13 +119,16 @@ void print_v(compressed_sparse_matrix& v,
 		offs += sprintf(offs + buf, "\n");
 	}
 	printf("%s", buf);
+	free(buf);
 }
 
 void print_vrow(compressed_sparse_matrix& v,
                 std::vector<index_diameter_t> columns_to_reduce) {
-	char buf[1024]; buf[0] = '\0';
 	int offs = 0;
 	int pad = 3;
+	char *buf = (char *) malloc(columns_to_reduce.size() * columns_to_reduce.size() *
+	                            pad + columns_to_reduce.size() + 10000);
+	buf[0] = '\0';
 	for(index_t row = 0; row < (index_t) columns_to_reduce.size(); ++row) {
 		for(index_t col = 0; col < (index_t) columns_to_reduce.size(); ++col) {
 			index_t col_ele = get_index(columns_to_reduce.at(col));
@@ -136,6 +141,7 @@ void print_vrow(compressed_sparse_matrix& v,
 		offs += sprintf(offs + buf, "\n");
 	}
 	printf("%s", buf);
+	free(buf);
 }
 
 void print_mat_simplices(ripser& ripser, compressed_sparse_matrix& v, index_t dim) {
