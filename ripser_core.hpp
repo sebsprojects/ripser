@@ -228,9 +228,6 @@ struct equal_index {
 // hash map with key = pivot index and value = column index
 // the column index is relative to the current dimension since we only have
 // a slice of V w.r.t to that dimension
-// We also store the basis element corresponding to V_j to reconstruct to
-// persistence pair in ripser_hom (needed in dim+1 where the column index is no
-// longer meaningful)
 typedef std::unordered_map<index_t,
                            size_t,
                            index_hash,
@@ -578,7 +575,7 @@ void add_boundary(ripser& ripser,
 	                     working_reduction_column,
 	                     working_boundary);
 	// Computation of R_j due to implicit reduction
-	for(size_t i = reduction_matrix.column_start(index_column_to_add);
+	for(index_t i = reduction_matrix.column_start(index_column_to_add);
 	    i < reduction_matrix.column_end(index_column_to_add);
 	    ++i) {
 		index_diameter_t simplex = reduction_matrix.get_entry(i);

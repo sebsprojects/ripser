@@ -200,7 +200,7 @@ void print_barcode(ripser& ripser, barcode& barcode, bool include_stats=false) {
 		value_t death = hc.death;
 		std::cout << "[" << birth;
 		if(death == INF) {
-			std::cout << ", )" << std::endl;
+			std::cout << ", ) :: ";
 		} else {
 			std::cout << "," << death << ") :: ";
 		}

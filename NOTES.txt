@@ -1,0 +1,15 @@
+
+ripser_hrep_*
+--------------------------------------------------------------------------------
+1. _hom_ref       :: homology with increasing dimension, no optimizations,
+                     reference implementation
+2. _hom           :: homology with increasing dimension, no clearing,
+                     otherwise full optimizations
+3. _hom_clearing  :: homology with decreasing dimension, full optimizations
+4. _cohom_hom     :: cohomology with a second homology pass to get
+                     representatives, full optimizations
+5. _cohom_inv     :: cohomology with matrix inversion to get representatives,
+                     full optimizations
+
+6. _cohom         :: cohomology for cohomology-representatives, full
+                     optimizatios
