@@ -29,6 +29,9 @@ ripser_cohom_apparent: ripser_cohom_apparent.cpp
 ripser_hrep_hom_ref: ripser_hrep_hom_ref.cpp
 	c++ -std=c++11 -Wall ripser_hrep_hom_ref.cpp -o ripser_hrep_hom_ref -g
 
+ripser_hrep_hom: ripser_hrep_hom.cpp
+	c++ -std=c++11 -Wall ripser_hrep_hom.cpp -o ripser_hrep_hom -g
+
 
 # HOMOLOGY
 
@@ -42,4 +45,4 @@ ripser_hom_cohom: ripser_hom_cohom.cpp
 	c++ -std=c++11 -Wall ripser_hom_cohom.cpp -o ripser_hom_cohom -g
 
 clean:
-	rm -f ripser_cohom ripser_cohom_clearing ripser_cohom_unionfind ripser_cohom_emergent ripser_cohom_apprent ripser_hom ripser_hom_clearing ripser_hom_cohom ripser_cohom_rep ripser_cohom_rep_row ripser_cohom_clearing_rep ripser_hrep_hom_ref
+	rm -f ripser_cohom ripser_cohom_clearing ripser_cohom_unionfind ripser_cohom_emergent ripser_cohom_apprent ripser_hom ripser_hom_clearing ripser_hom_cohom ripser_cohom_rep ripser_cohom_rep_row ripser_cohom_clearing_rep ripser_hrep_hom_ref ripser_hrep_hom

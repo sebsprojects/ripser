@@ -5,7 +5,10 @@
 
 /*
  * Compute the persistence barcode and homology representatives
- * Reduction algorithm for homology. Uses no optimizations.
+ * Reduction algorithm for homology. Uses optimizations
+ *   dim=0 union-find (replaces the reduction for dim=0)
+ *   emergent-pairs (sometimes omittes init_boundary_and_get_pivot)
+ *   apparent-pairs (sometimes omittes adding to columns_to_reduce)
  */
 
 typedef std::priority_queue<index_diameter_t,
@@ -16,18 +19,34 @@ typedef std::priority_queue<index_diameter_t,
 index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
                                              const index_diameter_t simplex,
                                              const index_t dim,
-                                             Column& working_boundary) {
+                                             Column& working_boundary,
+                                             entry_hash_map& pivot_column_index) {
 	if(dim == 0) {
 		return index_diameter_t(-1, -1);
 	}
 	simplex_boundary_enumerator facets(ripser);
 	facets.set_simplex(simplex, dim);
+	std::vector<index_diameter_t> working_boundary_buffer;
+	bool check_for_emergent_pair = true;
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
 		// Threshold check
 		if(get_diameter(facet) <= ripser.threshold) {
-			working_boundary.push(facet);
+			working_boundary_buffer.push_back(facet);
+			// Emergent pair: Zero persistence check
+			if(check_for_emergent_pair &&
+			   get_diameter(simplex) == get_diameter(facet)) {
+			    // Emergent pair: Pivot check
+				if(pivot_column_index.find(get_index(facet)) ==
+				   pivot_column_index.end()) {
+					return facet;
+				}
+				check_for_emergent_pair = false;
+			}
 		}
+	}
+	for(index_diameter_t facet : working_boundary_buffer) {
+		working_boundary.push(facet);
 	}
 	return get_pivot(working_boundary);
 }
@@ -47,7 +66,11 @@ void assemble_columns_to_reduce(ripser &ripser,
 			// Threshold check
 			if(get_diameter(cofacet) <= ripser.threshold) {
 				next_simplices.push_back(cofacet);
+				// Apparent pair check
+				// TODO: Dimension problem
+				//if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
 				columns_to_reduce.push_back(cofacet);
+				//}
 			}
 		}
 	}
@@ -72,7 +95,8 @@ void compute_pairs(ripser &ripser,
 		index_diameter_t pivot = init_boundary_and_get_pivot(ripser,
 		                                                     column_to_reduce,
 		                                                     dim,
-		                                                     working_boundary);
+		                                                     working_boundary,
+		                                                     pivot_column_index);
 		// The reduction
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
