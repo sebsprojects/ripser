@@ -279,6 +279,7 @@ struct ripser {
 	const DistanceMatrix dist;
 	const index_t n;
 	const index_t dim_max;
+	const index_t dim_threshold;
 	const value_t threshold;
 	const float ratio;
 	const binomial_coeff_table binomial_coeff;
@@ -286,14 +287,17 @@ struct ripser {
 	// Output
 	mutable std::vector<barcode> barcodes;
 
-	ripser(DistanceMatrix&& _dist, index_t _dim_max, value_t _threshold, float _ratio)
-		: dist(std::move(_dist)), n(dist.size()),
+	ripser(DistanceMatrix&& _dist, index_t _dim_max, index_t _dim_threshold, value_t _threshold, float _ratio)
+		: dist(std::move(_dist)),
+		  n(dist.size()),
 		  dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
-		  threshold(_threshold), ratio(_ratio),
+		  dim_threshold(_dim_threshold),
+		  threshold(_threshold),
+		  ratio(_ratio),
 		  binomial_coeff(n, dim_max + 2),
 		  barcodes(std::vector<barcode>())
 	{
-		for(index_t i = 0; i <= dim_max; ++i) {
+		for(index_t i = 0; i <= dim_threshold; ++i) {
 			barcodes.push_back(barcode(i));
 		}
 	}
@@ -687,8 +691,14 @@ index_diameter_t get_zero_apparent_cofacet(ripser& ripser, index_diameter_t simp
 }
 
 bool is_in_zero_apparent_pair(ripser& ripser, index_diameter_t simplex, index_t dim) {
-	return (get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1) ||
-	       (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1);
+	if(dim == 0) {
+		return get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1;
+	} else if(dim == ripser.dim_max) {
+		return (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1);
+	} else {
+		return (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1) ||
+		       (get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1);
+	}
 }
 
 
