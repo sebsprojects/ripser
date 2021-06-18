@@ -4,7 +4,8 @@
 #include "print_utils.hpp"
 
 /*
- * Compute the persistence barcode and homology representatives
+ * Compute the persistence barcode and homology representatives in increasing
+ * dimension from [0..dim_threshold]
  * Reduction algorithm for homology. Uses optimizations
  *   dim=0 union-find (replaces the reduction for dim=0)
  *   emergent-pairs (sometimes omittes init_boundary_and_get_pivot)
