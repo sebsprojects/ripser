@@ -26,15 +26,37 @@ typedef std::priority_queue<index_diameter_t,
 index_diameter_t cohom_init_coboundary_and_get_pivot(ripser &ripser,
                                                      const index_diameter_t simplex,
                                                      const index_t dim,
-                                                     Cohom_Column& working_coboundary) {
+                                                     Cohom_Column& working_coboundary,
+                                                     entry_hash_map& pivot_column_index) {
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
+	bool check_for_emergent_pair = true;
+	// TODO: Find a more efficient solution to this annoying problem
+	std::vector<index_diameter_t> working_coboundary_buffer;
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
 		// Threshold check
 		if(get_diameter(cofacet) <= ripser.threshold) {
-			working_coboundary.push(cofacet);
+			working_coboundary_buffer.push_back(cofacet);
+			// Emergent pair candidate check
+			if(check_for_emergent_pair &&
+			   (get_diameter(simplex) == get_diameter(cofacet))) {
+				// Check if the candidate is viable, if not then we certainly
+				// do not have an emergent pair
+				// TODO: Why is the check for the apparent facet necessary?
+				if((pivot_column_index.find(get_index(cofacet)) ==
+				    pivot_column_index.end()) &&
+				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
+					// working_coboundary is the 0-column
+					ripser.barcodes.at(dim).emergent_count++;
+					return cofacet;
+				}
+				check_for_emergent_pair = false;
+			}
 		}
+	}
+	for(index_diameter_t cofacet : working_coboundary_buffer) {
+		working_coboundary.push(cofacet);
 	}
 	return get_pivot(working_coboundary);
 }
@@ -76,7 +98,12 @@ void assemble_columns_to_reduce(ripser &ripser,
 				// Clearing check
 				if(pivot_column_index.find(get_index(cofacet)) ==
 				   pivot_column_index.end()) {
-					columns_to_reduce.push_back(cofacet);
+					// Apparent Pair check
+					if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
+						columns_to_reduce.push_back(cofacet);
+					} else {
+						ripser.barcodes.at(dim).apparent_count++;
+					}
 				} else {
 					ripser.barcodes.at(dim).clearing_count++;
 				}
@@ -102,7 +129,8 @@ void compute_cohomology(ripser &ripser,
 		index_diameter_t pivot = cohom_init_coboundary_and_get_pivot(ripser,
 		                                                             column_to_reduce,
 		                                                             dim,
-		                                                             working_coboundary);
+		                                                             working_coboundary,
+		                                                             pivot_column_index);
 		// The reduction
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
@@ -117,8 +145,19 @@ void compute_cohomology(ripser &ripser,
 				               working_coboundary);
 				pivot = get_pivot(working_coboundary);
 			} else {
-				pivot_column_index.insert({get_index(pivot), j});
-				break;
+				index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
+				if(get_index(e) != -1) {
+					// TODO: Why is the necessary w.r.t. apparent pairs?
+					add_simplex_coboundary(ripser,
+					                       e,
+					                       dim,
+					                       working_reduction_column,
+					                       working_coboundary);
+					pivot = get_pivot(working_coboundary);
+				} else {
+					pivot_column_index.insert({get_index(pivot), j});
+					break;
+				}
 			}
 		}
 		// Write V_j to V
@@ -168,8 +207,19 @@ void compute_homology(ripser &ripser,
 				             working_boundary);
 				pivot = get_pivot(working_boundary);
 			} else {
-				pivot_column_index.insert({get_index(pivot), j});
-				break;
+				index_diameter_t e = get_zero_apparent_cofacet(ripser, pivot, dim - 1);
+				if(get_index(e) != -1) {
+					// TODO: Why is the necessary w.r.t. apparent pairs?
+					add_simplex_boundary(ripser,
+					                     e,
+					                     dim,
+					                     working_reduction_column,
+					                     working_boundary);
+					pivot = get_pivot(working_boundary);
+				} else {
+					pivot_column_index.insert({get_index(pivot), j});
+					break;
+				}
 			}
 		}
 		// Write V_j to V
