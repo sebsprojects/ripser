@@ -150,7 +150,8 @@ void compute_barcodes(ripser& ripser) {
 		std::vector<index_t> rep{ i };
 		prev_zero_column_index.insert({i, rep});
 	}
-	for(index_t dim = 1; dim <= ripser.dim_max + 1; ++dim) {
+	index_t last_dim = std::min(ripser.dim_threshold + 1, ripser.dim_max);
+	for(index_t dim = 1; dim <= last_dim; ++dim) {
 		std::vector<index_diameter_t> columns_to_reduce;
 		assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
 		pivot_column_index.clear();
@@ -185,11 +186,12 @@ int main(int argc, char** argv) {
 	}
 	DistanceMatrix dist = read_lower_distance_matrix(file_stream);
 	value_t enclosing_radius = compute_enclosing_radius(dist);
-	index_t dim_max = 1;
+	index_t dim_max = 2;
+	index_t dim_threshold = 1;
 	float ratio = 1;
-	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
+	ripser ripser(std::move(dist), dim_max, dim_threshold, enclosing_radius, ratio);
 	list_all_simplices(ripser);
 	compute_barcodes(ripser);
-	print_barcodes(ripser, false);
+	print_barcodes(ripser, true);
 	exit(0);
 }
