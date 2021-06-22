@@ -257,7 +257,7 @@ int main(int argc, char** argv) {
 	index_t dim_threshold = 1;
 	float ratio = 1;
 	ripser ripser(std::move(dist), dim_max, dim_threshold, enclosing_radius, ratio);
-	list_all_simplices(ripser);
+	//list_all_simplices(ripser);
 	compute_barcodes(ripser);
 	print_barcodes(ripser, true);
 	//simplex_boundary_enumerator b(ripser);

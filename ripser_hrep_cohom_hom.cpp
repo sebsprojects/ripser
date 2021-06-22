@@ -48,7 +48,7 @@ index_diameter_t cohom_init_coboundary_and_get_pivot(ripser &ripser,
 				    pivot_column_index.end()) &&
 				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
 					// working_coboundary is the 0-column
-					ripser.barcodes.at(dim).emergent_count++;
+					ripser.infos.at(dim).emergent_count++;
 					return cofacet;
 				}
 				check_for_emergent_pair = false;
@@ -85,6 +85,8 @@ void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& columns_to_reduce,
                                 entry_hash_map& pivot_column_index,
                                 const index_t dim) {
+	info& info = ripser.infos.at(dim);
+	time_point assemble_start = get_time();
 	columns_to_reduce.clear();
 	std::vector<index_diameter_t> next_simplices;
 	simplex_coboundary_enumerator cofacets(ripser);
@@ -102,10 +104,10 @@ void assemble_columns_to_reduce(ripser &ripser,
 					if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
 						columns_to_reduce.push_back(cofacet);
 					} else {
-						ripser.barcodes.at(dim).apparent_count++;
+						info.apparent_count++;
 					}
 				} else {
-					ripser.barcodes.at(dim).clearing_count++;
+					info.clearing_count++;
 				}
 			}
 		}
@@ -113,12 +115,18 @@ void assemble_columns_to_reduce(ripser &ripser,
 	simplices.swap(next_simplices);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
               reverse_filtration_order);
+	time_point assemble_end = get_time();
+	info.assemble_dur = get_duration(assemble_start, assemble_end);
+	info.simplex_total_count = simplices.size();
+	info.simplex_reduction_count = columns_to_reduce.size();
 }
 
 void compute_cohomology(ripser &ripser,
                         const std::vector<index_diameter_t>& columns_to_reduce,
                         entry_hash_map& pivot_column_index,
                         const index_t dim) {
+	info& info = ripser.infos.at(dim);
+	time_point reduction_start = get_time();
 	compressed_sparse_matrix reduction_matrix; // V
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		reduction_matrix.append_column();
@@ -175,6 +183,8 @@ void compute_cohomology(ripser &ripser,
 			ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
 		}
 	}
+	time_point reduction_end = get_time();
+	info.reduction_dur = get_duration(reduction_start, reduction_end);
 }
 
 // dim corresponds to the dim of simplices in columns_to_reduce
@@ -182,6 +192,8 @@ void compute_homology(ripser &ripser,
                       const std::vector<index_diameter_t>& columns_to_reduce,
                       entry_hash_map& pivot_column_index,
                       const index_t dim) {
+	info& info = ripser.infos.at(dim - 1);
+	time_point rep_start = get_time();
 	compressed_sparse_matrix reduction_matrix; // V
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		reduction_matrix.append_column();
@@ -245,6 +257,8 @@ void compute_homology(ripser &ripser,
 			assert(false);
 		}
 	}
+	time_point rep_end = get_time();
+	info.representative_dur = get_duration(rep_start, rep_end);
 }
 
 void compute_barcodes(ripser& ripser) {
@@ -259,6 +273,8 @@ void compute_barcodes(ripser& ripser) {
 	entry_hash_map pivot_column_index;
 	entry_hash_map boundary_pivot_column_index;
 	// cohom in dim=0
+	ripser.infos.at(0).simplex_total_count = simplices.size();
+	ripser.infos.at(0).simplex_reduction_count = simplices.size();
 	compute_cohomology(ripser, columns_to_reduce, pivot_column_index, 0);
 	index_t last_dim = std::min(ripser.dim_threshold + 1, ripser.dim_max);
 	for(index_t dim = 1; dim <= last_dim; ++dim) {
@@ -297,7 +313,7 @@ void compute_barcodes(ripser& ripser) {
  * *************************************************************************/
 
 int main(int argc, char** argv) {
-	const char* filename = nullptr;
+    std::string filename = "";
 	if(argc == 2) {
 		filename = argv[1];
 	} else {
@@ -307,7 +323,7 @@ int main(int argc, char** argv) {
 	}
 	// Reading the distance matrix from file
 	std::ifstream file_stream(filename);
-	if (filename && file_stream.fail()) {
+	if (filename != "" && file_stream.fail()) {
 		std::cerr << "error: couldn't open file " << filename << std::endl;
 		exit(-1);
 	}
@@ -319,6 +335,12 @@ int main(int argc, char** argv) {
 	ripser ripser(std::move(dist), dim_max, dim_threshold, enclosing_radius, ratio);
 	//list_all_simplices(ripser);
 	compute_barcodes(ripser);
-	print_barcodes(ripser, true);
+	print_barcodes(ripser); std::cout << "\n\n";
+	print_infos(ripser);
+	std::string fn_pre = "./output/cycle_rep_dim1/";
+	std::string fn = filename.substr(filename.find_last_of("/") + 1);
+	fn = fn.substr(0, fn.find_last_of("."));
+	std::string fn_post = "_cohom_hom.txt";
+	write_dim1_cycles(ripser, fn_pre + fn + fn_post);
 	exit(0);
 }

@@ -38,6 +38,8 @@ void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& simplices,
                                 std::vector<index_diameter_t>& columns_to_reduce,
                                 const index_t dim) {
+	info& info = ripser.infos.at(dim - 1);
+	time_point assemble_start = get_time();
 	columns_to_reduce.clear();
 	std::vector<index_diameter_t> next_simplices;
 	simplex_coboundary_enumerator cofacets(ripser);
@@ -54,6 +56,10 @@ void assemble_columns_to_reduce(ripser &ripser,
 	}
 	simplices.swap(next_simplices);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), filtration_order);
+	time_point assemble_end = get_time();
+	info.assemble_dur = get_duration(assemble_start, assemble_end);
+	info.simplex_total_count = simplices.size();
+	info.simplex_reduction_count = columns_to_reduce.size();
 }
 
 void compute_pairs(ripser &ripser,
@@ -61,6 +67,8 @@ void compute_pairs(ripser &ripser,
                    entry_hash_map& pivot_column_index,
                    std::unordered_map<index_t, std::vector<index_t>>& prev_zero_column_index,
                    const index_t dim) {
+	info& info = ripser.infos.at(dim - 1);
+	time_point reduction_start = get_time();
 	compressed_sparse_matrix reduction_matrix; // V
 	std::unordered_map<index_t, std::vector<index_t>> zero_column_index;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
@@ -124,6 +132,8 @@ void compute_pairs(ripser &ripser,
 			zero_column_index.insert({get_index(column_to_reduce), rep});
 		}
 	}
+	time_point reduction_end = get_time();
+	time_point rep_start = get_time();
 	// Determine essential pairs by iterating all candidates (zero columns
 	// of previous dimension). If such a candidate is not a pivot, we have
 	// and essential index
@@ -138,6 +148,9 @@ void compute_pairs(ripser &ripser,
 		}
 	}
 	prev_zero_column_index.swap(zero_column_index);
+	time_point rep_end = get_time();
+	info.reduction_dur = get_duration(reduction_start, reduction_end);
+	info.representative_dur = get_duration(rep_start, rep_end);
 }
 
 void compute_barcodes(ripser& ripser) {
@@ -191,8 +204,9 @@ int main(int argc, char** argv) {
 	index_t dim_threshold = 1;
 	float ratio = 1;
 	ripser ripser(std::move(dist), dim_max, dim_threshold, enclosing_radius, ratio);
-	list_all_simplices(ripser);
+	//list_all_simplices(ripser);
 	compute_barcodes(ripser);
-	print_barcodes(ripser, true);
+	print_barcodes(ripser); std::cout << "\n\n";
+	print_infos(ripser);
 	exit(0);
 }

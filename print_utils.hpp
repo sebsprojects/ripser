@@ -183,18 +183,11 @@ void print_mat(compressed_sparse_matrix& mat) {
 	printf("%s", buf);
 }
 
-void print_barcode(ripser& ripser, barcode& barcode, bool include_stats=false) {
-	std::cout << "persistence intervals in dim " << barcode.dim << ":";
-	if(include_stats) {
-		std::cout << " [ c=" << barcode.clearing_count
-		          << ", e=" << barcode.emergent_count
-		          << ", a=" << barcode.apparent_count << " ]";
-	}
-	std::cout << std::endl;
+void print_barcode(ripser& ripser, barcode& barcode) {
+	std::cout << "persistence intervals in dim " << barcode.dim << ":" << std::endl;
 	std::sort(barcode.hom_classes.begin(),
 	          barcode.hom_classes.end(),
 	          homology_class_order);
-		
 	for(auto hc : barcode.hom_classes) {
 		value_t birth = std::max(0.0f, hc.birth);
 		value_t death = hc.death;
@@ -212,12 +205,57 @@ void print_barcode(ripser& ripser, barcode& barcode, bool include_stats=false) {
 	}
 }
 
-void print_barcodes(ripser& ripser, bool include_stats=false) {
+void write_dim1_cycles(ripser& ripser, std::string filename) {
+	barcode& barcode = ripser.barcodes.at(1);
+	std::sort(barcode.hom_classes.begin(),
+	          barcode.hom_classes.end(),
+	          homology_class_order);
+	std::ofstream ofs(filename, std::ofstream::trunc);
+	for(auto hc : barcode.hom_classes) {
+		ofs << "# " << std::max(0.0f, hc.birth) << " " << hc.death << std::endl;
+		std::vector<index_t> vertices(2, -1);
+		for(index_t simplex : hc.representative) {
+			ripser.get_simplex_vertices(simplex, 1, ripser.n, vertices);
+			ofs << vertices.at(0) << " " << vertices.at(1) << std::endl;
+		}
+		ofs << std::endl;
+	}
+	ofs.close();
+}
+
+void print_barcodes(ripser& ripser) {
 	std::sort(ripser.barcodes.begin(), ripser.barcodes.end(), barcode_order);
 	for(auto b : ripser.barcodes) {
-		print_barcode(ripser, b, include_stats);
+		print_barcode(ripser, b);
 	}
 }
 
+void print_info(ripser& ripser, info& info) {
+	std::cout << "info in dim " << info.dim << ":" << std::endl;
+	std::cout << "  total simplex count:     "
+	          << info.simplex_total_count << std::endl;
+	std::cout << "  reduction simplex count: "
+	          << info.simplex_reduction_count << std::endl << std::endl;
+
+	std::cout << "  clearing count:          "
+	          << info.clearing_count << std::endl;
+	std::cout << "  emergent count:          "
+	          << info.emergent_count << std::endl;
+	std::cout << "  apparent count:          "
+	          << info.apparent_count << std::endl;
+
+	std::cout << "  assemble duration:       "
+	          << info.assemble_dur.count() << "s" << std::endl;
+	std::cout << "  reduction duration:      "
+	          << info.reduction_dur.count() << "s" << std::endl;
+	std::cout << "  representative duration: "
+	          << info.representative_dur.count() << "s" << std::endl;
+}
+
+void print_infos(ripser& ripser) {
+	for(auto i : ripser.infos) {
+		print_info(ripser, i);
+	}
+}
 
 #endif

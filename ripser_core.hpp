@@ -9,6 +9,7 @@
 #include <queue>
 #include <sstream>
 #include <unordered_map>
+#include <chrono>
 
 
 /* **************************************************************************
@@ -253,16 +254,10 @@ struct homology_class {
 struct barcode {
 	index_t dim;
 	std::vector<homology_class> hom_classes;
-	size_t clearing_count;
-	size_t emergent_count;
-	size_t apparent_count;
 
 	barcode(index_t _dim)
 		: dim(_dim),
-		  hom_classes(),
-		  clearing_count(0),
-		  emergent_count(0),
-		  apparent_count(0)
+		  hom_classes()
 	{ }
 };
 
@@ -272,6 +267,36 @@ bool barcode_order(const barcode& a, const barcode& b) {
 
 bool homology_class_order(homology_class& a, homology_class& b) {
 	return (a.birth < b.birth) || (a.birth == b.birth && a.death < b.death );
+}
+
+typedef std::chrono::steady_clock::time_point time_point;
+typedef std::chrono::duration<double> duration;
+
+struct info {
+	index_t dim;
+	size_t clearing_count;
+	size_t emergent_count;
+	size_t apparent_count;
+	size_t simplex_total_count;
+	size_t simplex_reduction_count;
+	
+	duration assemble_dur;
+	duration reduction_dur;
+	duration representative_dur;
+
+	info(index_t _dim)
+		: dim(_dim), clearing_count(0), emergent_count(0), apparent_count(0),
+		  simplex_total_count(0), simplex_reduction_count(0),
+		  assemble_dur(), reduction_dur(), representative_dur()
+	{ }
+};
+
+time_point get_time() {
+	return std::chrono::steady_clock::now();
+}
+
+duration get_duration(time_point start, time_point end) {
+	return end - start;
 }
 
 struct ripser {
@@ -286,6 +311,7 @@ struct ripser {
 	
 	// Output
 	mutable std::vector<barcode> barcodes;
+	mutable std::vector<info> infos;
 
 	ripser(DistanceMatrix&& _dist, index_t _dim_max, index_t _dim_threshold, value_t _threshold, float _ratio)
 		: dist(std::move(_dist)),
@@ -299,6 +325,7 @@ struct ripser {
 	{
 		for(index_t i = 0; i <= dim_threshold; ++i) {
 			barcodes.push_back(barcode(i));
+			infos.push_back(info(i));
 		}
 	}
 	
@@ -727,10 +754,10 @@ value_t compute_enclosing_radius(DistanceMatrix& dist) {
 			max_finite = std::max(max_finite, d);
 		}
 	}
-	std::cout << "info: value range: [" << min << "," << max_finite << "]" << std::endl;
-	std::cout << "info: distance matrix with " << dist.size()
-			  << " points, using threshold at enclosing radius " << enclosing_radius
-			  << std::endl;
+	//std::cout << "info: value range: [" << min << "," << max_finite << "]" << std::endl;
+	//std::cout << "info: distance matrix with " << dist.size()
+	//		  << " points, using threshold at enclosing radius " << enclosing_radius
+	//		  << std::endl;
 	return enclosing_radius;
 }
 
