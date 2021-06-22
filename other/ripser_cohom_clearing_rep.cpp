@@ -31,9 +31,13 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 // to contain all cofacets of those simplices
 // ordered column indices (indexed by dim-simplices) of the coboundary matrix
 // Sets simplices to contain all dim-simplices
+//
+// Clearing: We take the pivots from the reduction in dim-1 and ignore columns
+// that appeared as a pivot
 void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& simplices,
                                 std::vector<index_diameter_t>& columns_to_reduce,
+                                entry_hash_map& pivot_column_index,
                                 const index_t dim) {
 	columns_to_reduce.clear();
 	std::vector<index_diameter_t> next_simplices;
@@ -43,9 +47,15 @@ void assemble_columns_to_reduce(ripser &ripser,
 		while(cofacets.has_next(false)) {
 			index_diameter_t cofacet = cofacets.next();
 			// Threshold check
+			next_simplices.push_back(cofacet);
 			if(get_diameter(cofacet) <= ripser.threshold) {
-				next_simplices.push_back(cofacet);
-				columns_to_reduce.push_back(cofacet);
+				// Clearing check
+				if(pivot_column_index.find(get_index(cofacet)) ==
+				   pivot_column_index.end()) {
+					columns_to_reduce.push_back(cofacet);
+				} else {
+					ripser.barcodes.at(dim).clearing_count++;
+				}
 			}
 		}
 	}
@@ -54,15 +64,20 @@ void assemble_columns_to_reduce(ripser &ripser,
               reverse_filtration_order);
 }
 
+typedef std::unordered_map<index_t,
+                           std::vector<index_diameter_t>> column_hash_map;
+
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
-                   const entry_hash_map& previous_pivots,
+                   column_hash_map prev_reduced_cols,
+                   column_hash_map reduced_cols,
                    const index_t dim) {
 	compressed_sparse_matrix reduction_matrix; // V
 	compressed_sparse_matrix v_inv;
 	std::vector<std::pair<index_t, index_t>> nonessential_red;
-	for(index_t j = 0; j < (index_t) columns_to_reduce.size(); ++j) { // For j in J
+	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+		reduction_matrix.append_column();
 		Column working_reduction_column; // V_j
 		Column working_coboundary;       // R_j
 		// Assemble the column j (corresponding to the simplex column_to_reduce)
@@ -70,7 +85,7 @@ void compute_pairs(ripser &ripser,
 		index_diameter_t column_to_reduce = columns_to_reduce.at(j);
 		index_diameter_t pivot = init_coboundary_and_get_pivot(ripser,
 		                                                       column_to_reduce,
-                                                                         dim,
+		                                                       dim,
 		                                                       working_coboundary);
 		// The reduction
 		// The loop terminates on either of two conditions
@@ -94,30 +109,37 @@ void compute_pairs(ripser &ripser,
 			}
 		}
 		// Write V_j to V
-		reduction_matrix.append_column();
 		index_diameter_t e = pop_pivot(working_reduction_column);
 		while(get_index(e) != -1) {
 			reduction_matrix.push_back(e);
 			e = pop_pivot(working_reduction_column);
 		}
+		// Write R_j to reduced_cols
+		if(get_index(pivot) != -1) {
+			std::vector<index_diameter_t> r_j;
+			while(get_index(pivot) != -1) {
+				r_j.push_back(pivot);
+				pivot = pop_pivot(working_coboundary);
+			}
+			reduced_cols.insert({get_index(column_to_reduce), r_j});
+		}
 		// Compute the new inverse of V and store it row-order
 		v_inv.append_column();
-		v_inv.push_back(column_to_reduce);
 		for(index_t k = 0; k < j; ++k) {
 			// Compute the inner product v_inv(k) * V_j
 			index_t sum = 0;
-			for(index_t i = reduction_matrix.column_start(j);
-			    i < reduction_matrix.column_end(j);
-			    ++i)
-			{
-				index_diameter_t v_ij = reduction_matrix.get_entry(i);
-				sum += v_inv.search_column(k, get_index(v_ij));
+			index_diameter_t row_simplex = columns_to_reduce.at(k);
+			for(index_t i = 0; i < v_inv.size(); ++i) {
+				if(v_inv.search_column(i, get_index(row_simplex))) {
+					index_t col_simplex = get_index(columns_to_reduce.at(i));
+					sum += reduction_matrix.search_column(j, col_simplex);
+				}
 			}
 			if(sum % 2 == 1) {
-				v_inv.push_at(k, column_to_reduce);
+				v_inv.push_back(row_simplex);
 			}
 		}
-		//print_mat_simplices(ripser, v_inv, dim);
+		v_inv.push_back(column_to_reduce);
 		// Determine Persistence Pair
 		value_t birth = get_diameter(column_to_reduce);
 		if(get_index(pivot) != -1) {
@@ -130,56 +152,49 @@ void compute_pairs(ripser &ripser,
 			}
 		} else {
 			// Zero column
-			auto pair = previous_pivots.find(get_index(column_to_reduce));
-			if(pair == previous_pivots.end()) {
-				// Essential index!
-				ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
-			} else {
-				// Killing index non-essential pair
-			}
+			// Since we use clearing, zero columns that correspond to killing
+			// simplices are filtered out by assemble_columns_to_reduce
+			// Thus all zero columns are birth indices of an essential pair
+			ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
 		}
 	}
 	// Assign the rows of v_inv correspoding to non-essential pairs to their
 	// respective homology class
-	for(index_t i = 0; i < (index_t) nonessential_red.size(); i++) {
+	for(index_t i = 0; i < (index_t) nonessential_red.size(); ++i) {
 		homology_class& h = ripser.barcodes.at(dim).hom_classes.at(nonessential_red.at(i).first);
 		index_t row_index = nonessential_red.at(i).second;
-		for(index_t k = v_inv.column_start(row_index); k < v_inv.column_end(row_index); k++) {
-			h.representative.push_back(get_index(v_inv.get_entry(k)));
+		index_t row_simplex = get_index(columns_to_reduce.at(row_index));
+		// Go over all columns in v_inv and check if they contain row_simplex
+		// If yes, then add the column simplex to the representative
+		for(index_t k = 0; k < v_inv.size(); ++k) {
+			if(v_inv.search_column(k, row_simplex)) {
+				h.representative.push_back(get_index(columns_to_reduce.at(k)));
+			}
 		}
-	}
-	//std::cout << std::endl << "V and V^-1: dim=" << dim << std::endl;
-	//print_v(reduction_matrix, columns_to_reduce);
-	//std::cout << std::endl;
-	//print_mat_simplices(ripser, v_inv, dim);
-	if(dim == 0) {
-		print_v(reduction_matrix, columns_to_reduce);
-		std::cout << std::endl;
-		print_vrow(v_inv, columns_to_reduce);
 	}
 }
 
 void compute_barcodes(ripser& ripser) {
-	ripser.barcodes.clear();
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
-	entry_hash_map previous_pivots;
+	column_hash_map prev_red_cols;
+	column_hash_map red_cols;
 	for(index_t i = 0; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
 	}
 	for(index_t dim = 0; dim <= ripser.dim_max; ++dim) {
-		ripser.barcodes.push_back(barcode(dim));
 		std::vector<index_diameter_t> columns_to_reduce;
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
 		} else {
-			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce, dim);
+			// Takes the pivots from the previous iteration
+			assemble_columns_to_reduce(ripser, simplices, columns_to_reduce,
+			                           pivot_column_index, dim);
 		}
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
-		compute_pairs(ripser, columns_to_reduce, pivot_column_index, previous_pivots, dim);
-		previous_pivots.swap(pivot_column_index);
+		compute_pairs(ripser, columns_to_reduce, pivot_column_index, prev_red_cols, red_cols, dim);
 	}
 }
 
@@ -208,8 +223,8 @@ int main(int argc, char** argv) {
 	index_t dim_max = 1;
 	float ratio = 1;
 	ripser ripser(std::move(dist), dim_max, enclosing_radius, ratio);
-	//list_all_simplices(ripser);
+	list_all_simplices(ripser);
 	compute_barcodes(ripser);
-	print_barcodes(ripser);
+	print_barcodes(ripser, true);
 	exit(0);
 }
