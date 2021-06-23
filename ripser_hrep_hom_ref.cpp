@@ -56,8 +56,7 @@ void assemble_columns_to_reduce(ripser &ripser,
 	}
 	simplices.swap(next_simplices);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), filtration_order);
-	time_point assemble_end = get_time();
-	info.assemble_dur = get_duration(assemble_start, assemble_end);
+	info.assemble_dur = get_duration(assemble_start, get_time());
 	info.simplex_total_count = simplices.size();
 	info.simplex_reduction_count = columns_to_reduce.size();
 }
@@ -132,7 +131,7 @@ void compute_pairs(ripser &ripser,
 			zero_column_index.insert({get_index(column_to_reduce), rep});
 		}
 	}
-	time_point reduction_end = get_time();
+	info.reduction_dur = get_duration(reduction_start, get_time());
 	time_point rep_start = get_time();
 	// Determine essential pairs by iterating all candidates (zero columns
 	// of previous dimension). If such a candidate is not a pivot, we have
@@ -148,9 +147,7 @@ void compute_pairs(ripser &ripser,
 		}
 	}
 	prev_zero_column_index.swap(zero_column_index);
-	time_point rep_end = get_time();
-	info.reduction_dur = get_duration(reduction_start, reduction_end);
-	info.representative_dur = get_duration(rep_start, rep_end);
+	info.representative_dur = get_duration(rep_start, get_time());
 }
 
 void compute_barcodes(ripser& ripser) {
