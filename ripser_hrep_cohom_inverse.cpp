@@ -9,8 +9,6 @@ typedef std::priority_queue<index_diameter_t,
                             std::vector<index_diameter_t>,
                             reverse_filtration_order_comp> Column;
 
-bool APPARENT_PAIRS = false;
-
 // Take a dim-simplex as input and assemble to coboundary matrix column
 // corresponding to that simplex. Return the pivot element of that column
 index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
@@ -33,11 +31,8 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			   (get_diameter(simplex) == get_diameter(cofacet))) {
 				// Check if the candidate is viable, if not then we certainly
 				// do not have an emergent pair
-				// TODO: Why is the check for the apparent facet necessary?
-				if((pivot_column_index.find(get_index(cofacet)) ==
-				    pivot_column_index.end()) &&
-				   (!APPARENT_PAIRS || get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
-					// working_coboundary is the 0-column
+				if(pivot_column_index.find(get_index(cofacet)) ==
+				   pivot_column_index.end()) {
 					ripser.infos.at(dim).emergent_count++;
 					return cofacet;
 				}
@@ -67,26 +62,14 @@ void assemble_columns_to_reduce(ripser &ripser,
 			// Threshold check
 			next_simplices.push_back(cofacet);
 			if(get_diameter(cofacet) <= ripser.threshold) {
-				// Clearing check
-				//if(pivot_column_index.find(get_index(cofacet)) ==
-				//   pivot_column_index.end()) {
-				// Apparent Pair check
-				if(!is_in_zero_apparent_pair(ripser, cofacet, dim) || !APPARENT_PAIRS) {
-					columns_to_reduce.push_back(cofacet);
-				} else {
-					ripser.infos.at(dim).apparent_count++;
-				}
-				//} else {
-				//	ripser.barcodes.at(dim).clearing_count++;
-				//}
+				columns_to_reduce.push_back(cofacet);
 			}
 		}
 	}
 	simplices.swap(next_simplices);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
               reverse_filtration_order);
-	time_point assemble_end = get_time();
-	info.assemble_dur = get_duration(assemble_start, assemble_end);
+	info.assemble_dur = get_duration(assemble_start, get_time());
 	info.simplex_total_count = simplices.size();
 	info.simplex_reduction_count = columns_to_reduce.size();
 }
@@ -125,19 +108,8 @@ void compute_pairs(ripser &ripser,
 				               working_coboundary);
 				pivot = get_pivot(working_coboundary);
 			} else {
-				index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
-				if(get_index(e) != -1 && APPARENT_PAIRS) {
-					// TODO: Why is the necessary w.r.t. apparent pairs?
-					add_simplex_coboundary(ripser,
-					                       e,
-					                       dim,
-					                       working_reduction_column,
-					                       working_coboundary);
-					pivot = get_pivot(working_coboundary);
-				} else {
-					pivot_column_index.insert({get_index(pivot), j});
-					break;
-				}
+				pivot_column_index.insert({get_index(pivot), j});
+				break;
 			}
 		}
 		// Write V_j to V. Does NOT contain duplicate entires anymore
@@ -148,8 +120,7 @@ void compute_pairs(ripser &ripser,
 			reduction_matrix.push_back(e);
 			e = pop_pivot(working_reduction_column);
 		}
-		time_point reduction_end = get_time();
-		info.reduction_dur += get_duration(reduction_start, reduction_end);
+		info.reduction_dur += get_duration(reduction_start, get_time());
 		time_point rep_start = get_time();
 		// Compute the new inverse of V and store it column-order
 		v_inv.append_column();
@@ -168,8 +139,7 @@ void compute_pairs(ripser &ripser,
 			}
 		}
 		v_inv.push_back(column_to_reduce);
-		time_point rep_end = get_time();
-		info.representative_dur += get_duration(rep_start, rep_end);
+		info.representative_dur += get_duration(rep_start, get_time());
 		//print_mat_simplices(ripser, v_inv, dim);
 		// Determine Persistence Pair
 		value_t birth = get_diameter(column_to_reduce);
@@ -276,6 +246,6 @@ int main(int argc, char** argv) {
 	std::string fn = filename.substr(filename.find_last_of("/") + 1);
 	fn = fn.substr(0, fn.find_last_of("."));
 	std::string fn_post = "_cohom_inverse.txt";
-	write_dim1_cycles(ripser, fn_pre + fn + fn_post);
+	//write_dim1_cycles(ripser, fn_pre + fn + fn_post);
 	exit(0);
 }

@@ -13,3 +13,11 @@ ripser_hrep_*
 
 6. _cohom         :: cohomology for cohomology-representatives, full
                      optimizatios
+
+
+inversion algorithm
+--------------------------------------------------------------------------------
+
+- compute cohomology in dim k, store reduced columns of R, invert V
+- row-vector products Wv to obtain new columns in W
+
