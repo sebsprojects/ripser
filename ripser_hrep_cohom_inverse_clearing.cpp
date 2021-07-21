@@ -150,12 +150,15 @@ void compute_pairs(ripser &ripser,
 				inversion_column.push_back(e);
 			    e = pop_pivot(working_reduction_column);
 			}
-			inversion_column.push_back(columns_to_reduce.at(columns_to_reduce_curr_index));
+			// Push back the diagonal entry since it is not stored in reduction_column
+			//inversion_column.push_back(columns_to_reduce.at(columns_to_reduce_curr_index));
 			// Write R_j to reduced_cols
 			// Note: This if still may eval to true if we have essential index
 			if(get_index(pivot) != -1) {
 				e = index_diameter_t(pivot);
 				std::vector<index_diameter_t> r_j;
+				// Additional pop pivot to remove 'diagonal' entry
+				e = pop_pivot(working_coboundary);
 				while(get_index(e) != -1) {
 					r_j.push_back(e);
 					e = pop_pivot(working_coboundary);
@@ -170,7 +173,7 @@ void compute_pairs(ripser &ripser,
 					// Non-essential pair
 					ripser.add_hom_class(dim, birth, death, std::vector<index_t>());
 					// Store which non-essential hom class corresponds to which column
-					//nonessential_red.push_back(std::make_pair(ripser.barcodes.at(dim).hom_classes.size() - 1, j));
+					nonessential_red.push_back(std::make_pair(ripser.barcodes.at(dim).hom_classes.size() - 1, j));
 				}
 			} else {
 				ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
@@ -183,10 +186,50 @@ void compute_pairs(ripser &ripser,
 		} else {
 			inversion_column = prev_reduced_cols.at(get_index(column));
 		}
-		for(index_t i = 0; i < inversion_column.size(); i++) {
-			std::cout << get_index(inversion_column.at(i)) << " ";
+		// Inversion of v_inv + inversion_column
+		time_point rep_start = get_time();
+		Column w;
+		// TODO: Needs a cleaner solution
+		if(v_inv.size() == 0) {
+			v_inv.append_column();
+			// Push diagonal entry
+			v_inv.push_back(columns.at(j));
+		} else {
+			v_inv.append_column();
+			for(index_diameter_t col_ele : inversion_column) {
+				// push the column of v_inv at col_ele to w
+				// TODO: This is linear in columns.size()
+				auto el = std::find(columns.begin(), columns.end(), col_ele);
+				assert(el != columns.end());
+				index_t column_index = el - columns.begin();
+				for(index_t k = v_inv.column_start(column_index); k < v_inv.column_end(column_index); ++k) {
+					w.push(v_inv.get_entry(k));
+				}
+			}
+			index_diameter_t e = pop_pivot(w);
+			while(get_index(e) != -1) {
+				v_inv.push_back(e);
+				e = pop_pivot(w);
+			}
+			// Push diagonal entry
+			v_inv.push_back(columns.at(j));
 		}
-		std::cout << std::endl;
+		info.representative_dur += get_duration(rep_start, get_time());
+	}
+	//print_v(v_inv, columns);
+	// Assign the rows of v_inv correspoding to non-essential pairs to their
+	// respective homology class
+	for(index_t i = 0; i < (index_t) nonessential_red.size(); ++i) {
+		homology_class& h = ripser.barcodes.at(dim).hom_classes.at(nonessential_red.at(i).first);
+		index_t row_index = nonessential_red.at(i).second;
+		index_t row_simplex = get_index(columns.at(row_index));
+		// Go over all columns in v_inv and check if they contain row_simplex
+		// If yes, then add the column simplex to the representative
+		for(index_t k = 0; k < v_inv.size(); ++k) {
+			if(v_inv.search_column(k, row_simplex)) {
+				h.representative.push_back(get_index(columns.at(k)));
+			}
+		}
 	}
 }
 
@@ -231,7 +274,7 @@ void compute_barcodes(ripser& ripser) {
  * *************************************************************************/
 
 int main(int argc, char** argv) {
-	const char* filename = nullptr;
+    std::string filename = "";
 	if(argc == 2) {
 		filename = argv[1];
 	} else {
@@ -241,7 +284,7 @@ int main(int argc, char** argv) {
 	}
 	// Reading the distance matrix from file
 	std::ifstream file_stream(filename);
-	if (filename && file_stream.fail()) {
+	if (filename != "" && file_stream.fail()) {
 		std::cerr << "error: couldn't open file " << filename << std::endl;
 		exit(-1);
 	}
@@ -253,63 +296,15 @@ int main(int argc, char** argv) {
 	ripser ripser(std::move(dist), dim_max, dim_threshold, enclosing_radius, ratio);
 	//list_all_simplices(ripser);
 	compute_barcodes(ripser);
-	print_barcodes(ripser);
+	print_barcodes(ripser); std::cout << "\n\n";
 	print_infos(ripser);
+	bool output_cycles = true;
+	if(output_cycles) {
+		std::string fn_pre = "./output/cycle_rep_dim1/";
+		std::string fn = filename.substr(filename.find_last_of("/") + 1);
+		fn = fn.substr(0, fn.find_last_of("."));
+		std::string fn_post = "_cohom_inv_clearing.txt";
+		write_dim1_cycles(ripser, fn_pre + fn + fn_post);
+	}
 	exit(0);
 }
-
-
-/*
-		info.reduction_dur += get_duration(reduction_start, reduction_end);
-		time_point rep_start = get_time();
-		// Compute the new inverse of V and store it column-order
-		v_inv.append_column();
-		for(index_t k = 0; k < j; ++k) {
-			// Compute the inner product v_inv(k) * V_j
-			index_t sum = 0;
-			index_diameter_t row_simplex = columns_to_reduce.at(k);
-			for(index_t i = 0; i < v_inv.size(); ++i) {
-				if(v_inv.search_column(i, get_index(row_simplex))) {
-					index_t col_simplex = get_index(columns_to_reduce.at(i));
-					sum += reduction_matrix.search_column(j, col_simplex);
-				}
-			}
-			if(sum % 2 == 1) {
-				v_inv.push_back(row_simplex);
-			}
-		}
-		v_inv.push_back(column_to_reduce);
-		time_point rep_end = get_time();
-		// Determine Persistence Pair
-		value_t birth = get_diameter(column_to_reduce);
-		if(get_index(pivot) != -1) {
-			value_t death = get_diameter(pivot);
-			if(death > birth * ripser.ratio) {
-				// Non-essential pair
-				ripser.add_hom_class(dim, birth, death, std::vector<index_t>());
-				// Store which non-essential hom class corresponds to which column
-				nonessential_red.push_back(std::make_pair(ripser.barcodes.at(dim).hom_classes.size() - 1, j));
-			}
-		} else {
-			// Zero column
-			// Since we use clearing, zero columns that correspond to killing
-			// simplices are filtered out by assemble_columns_to_reduce
-			// Thus all zero columns are birth indices of an essential pair
-			ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
-		}
-	}
-	// Assign the rows of v_inv correspoding to non-essential pairs to their
-	// respective homology class
-	for(index_t i = 0; i < (index_t) nonessential_red.size(); ++i) {
-		homology_class& h = ripser.barcodes.at(dim).hom_classes.at(nonessential_red.at(i).first);
-		index_t row_index = nonessential_red.at(i).second;
-		index_t row_simplex = get_index(columns_to_reduce.at(row_index));
-		// Go over all columns in v_inv and check if they contain row_simplex
-		// If yes, then add the column simplex to the representative
-		for(index_t k = 0; k < v_inv.size(); ++k) {
-			if(v_inv.search_column(k, row_simplex)) {
-				h.representative.push_back(get_index(columns_to_reduce.at(k)));
-			}
-		}
-	}
- */
