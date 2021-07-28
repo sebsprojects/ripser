@@ -31,8 +31,10 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			   (get_diameter(simplex) == get_diameter(cofacet))) {
 				// Check if the candidate is viable, if not then we certainly
 				// do not have an emergent pair
-				if(pivot_column_index.find(get_index(cofacet)) ==
-				   pivot_column_index.end()) {
+				// TODO: Why is the check for the apparent facet necessary?
+				if((pivot_column_index.find(get_index(cofacet)) ==
+				    pivot_column_index.end()) &&
+				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
 					ripser.infos.at(dim).emergent_count++;
 					return cofacet;
 				}
@@ -73,7 +75,12 @@ void assemble_columns_to_reduce(ripser &ripser,
 				// Clearing check
 				if(pivot_column_index.find(get_index(cofacet)) ==
 				   pivot_column_index.end()) {
-					columns_to_reduce.push_back(cofacet);
+					// Apparent Pair check
+					if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
+						columns_to_reduce.push_back(cofacet);
+					} else {
+						info.apparent_count++;
+					}
 				} else {
 					info.clearing_count++;
 				}
@@ -121,10 +128,10 @@ void compute_pairs(ripser &ripser,
 			Column working_coboundary;       // R_j
 			// Assemble
 			index_diameter_t pivot = init_coboundary_and_get_pivot(ripser,
-		                                                           column_to_reduce,
-		                                                           dim,
-		                                                           working_coboundary,
-		                                                           pivot_column_index);
+			                                                       column_to_reduce,
+			                                                       dim,
+			                                                       working_coboundary,
+			                                                       pivot_column_index);
 			// The reduction
 			while(get_index(pivot) != -1) {
 				auto pair = pivot_column_index.find(get_index(pivot));
@@ -139,16 +146,26 @@ void compute_pairs(ripser &ripser,
 				                   working_coboundary);
 					pivot = get_pivot(working_coboundary);
 				} else {
-				    pivot_column_index.insert({get_index(pivot), columns_to_reduce_curr_index});
-				    break;
+					index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
+					if(get_index(e) != -1) {
+						add_simplex_coboundary(ripser,
+						                       e,
+						                       dim,
+						                       working_reduction_column,
+						                       working_coboundary);
+						pivot = get_pivot(working_coboundary);
+					} else {
+						pivot_column_index.insert({get_index(pivot), columns_to_reduce_curr_index});
+						break;
+					}
 				}
 			}
 			index_diameter_t e = pop_pivot(working_reduction_column);
 			// Write reduction_column to V and inversion_column
 			while(get_index(e) != -1) {
-			    reduction_matrix.push_back(e);
+				reduction_matrix.push_back(e);
 				inversion_column.push_back(e);
-			    e = pop_pivot(working_reduction_column);
+				e = pop_pivot(working_reduction_column);
 			}
 			// Push back the diagonal entry since it is not stored in reduction_column
 			//inversion_column.push_back(columns_to_reduce.at(columns_to_reduce_curr_index));
@@ -184,7 +201,14 @@ void compute_pairs(ripser &ripser,
 				columns_to_reduce_curr_index++;
 			}
 		} else {
-			inversion_column = prev_reduced_cols.at(get_index(column));
+			auto keyval = prev_reduced_cols.find(get_index(column));
+			if(keyval != prev_reduced_cols.end()) {
+				// Clearing, replace by reduced coboundary column of previous dim
+				inversion_column = prev_reduced_cols.at(get_index(column));
+			} else {
+				// Apparent pair, the column of V is zero until the diag entry
+				// Do nothing
+			}
 		}
 		// Inversion of v_inv + inversion_column
 		time_point rep_start = get_time();
@@ -197,11 +221,18 @@ void compute_pairs(ripser &ripser,
 		} else {
 			v_inv.append_column();
 			for(index_diameter_t col_ele : inversion_column) {
+				// Binary search the column index of col_ele in columns
+				auto it = std::lower_bound(columns.begin(), columns.end(), col_ele, reverse_filtration_order);
+				index_t column_index = std::distance(columns.begin(), it);
 				// push the column of v_inv at col_ele to w
-				// TODO: This is linear in columns.size()
-				auto el = std::find(columns.begin(), columns.end(), col_ele);
-				assert(el != columns.end());
-				index_t column_index = el - columns.begin();
+				// TODONE: This is linear in columns.size()
+				//auto el = std::find(columns.begin(), columns.end(), col_ele);
+				//index_t column_index = el - columns.begin();
+				//assert(el != columns.end());
+				// Binary search:
+				//assert(it != columns.end());
+				//assert(*it == col_ele);
+				//assert(column_index_temp == column_index);
 				for(index_t k = v_inv.column_start(column_index); k < v_inv.column_end(column_index); ++k) {
 					w.push(v_inv.get_entry(k));
 				}
