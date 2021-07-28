@@ -108,6 +108,9 @@ void compute_pairs(ripser &ripser,
                    column_hash_map& reduced_cols, // to return the reduced cols in this dim
                    const index_t dim) {
 	info& info = ripser.infos.at(dim);
+	info.misc_durs.push_back(duration());
+	info.misc_durs.push_back(duration());
+	info.misc_durs.push_back(duration());
 	compressed_sparse_matrix reduction_matrix; // V
 	compressed_sparse_matrix v_inv; // Inverse of V (with possible replacement columns)
 	std::vector<std::pair<index_t, index_t>> nonessential_red;
@@ -121,7 +124,10 @@ void compute_pairs(ripser &ripser,
 		// If not, skip the reduction and use a reduced column of R from the
 		// previous dimension instead
 		//std::cout << "Processing j=" << j << "/" << columns.size() << " :: " << get_index(column) << " :: " << get_index(column_to_reduce) << std::endl;
+		// 0 for V-column, 1 for R-column (clearing), 2 for 0-column (apparent pair)
+		size_t inversion_type = 0;
 		if(column == column_to_reduce) {
+			inversion_type = 0;
 			time_point reduction_start = get_time();
 			reduction_matrix.append_column();
 			Column working_reduction_column; // V_j
@@ -203,9 +209,11 @@ void compute_pairs(ripser &ripser,
 		} else {
 			auto keyval = prev_reduced_cols.find(get_index(column));
 			if(keyval != prev_reduced_cols.end()) {
+				inversion_type = 1;
 				// Clearing, replace by reduced coboundary column of previous dim
 				inversion_column = prev_reduced_cols.at(get_index(column));
 			} else {
+				  inversion_type = 2;
 				// Apparent pair, the column of V is zero until the diag entry
 				// Do nothing
 			}
@@ -246,6 +254,7 @@ void compute_pairs(ripser &ripser,
 			v_inv.push_back(columns.at(j));
 		}
 		info.representative_dur += get_duration(rep_start, get_time());
+		info.misc_durs.at(inversion_type) += get_duration(rep_start, get_time());
 	}
 	//print_v(v_inv, columns);
 	// Assign the rows of v_inv correspoding to non-essential pairs to their

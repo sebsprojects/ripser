@@ -284,10 +284,12 @@ struct info {
 	duration reduction_dur;
 	duration representative_dur;
 
+	std::vector<duration> misc_durs;
+
 	info(index_t _dim)
 		: dim(_dim), clearing_count(0), emergent_count(0), apparent_count(0),
 		  simplex_total_count(0), simplex_reduction_count(0),
-		  assemble_dur(), reduction_dur(), representative_dur()
+		  assemble_dur(), reduction_dur(), representative_dur(), misc_durs()
 	{ }
 };
 

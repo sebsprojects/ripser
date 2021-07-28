@@ -249,7 +249,12 @@ void print_info(ripser& ripser, info& info) {
 	std::cout << "  reduction duration:      "
 	          << info.reduction_dur.count() << "s" << std::endl;
 	std::cout << "  representative duration: "
-	          << info.representative_dur.count() << "s" << std::endl;
+	          << info.representative_dur.count() << "s" << std::endl << std::endl;
+
+	for(size_t i = 0; i < info.misc_durs.size(); i++) {
+	  std::cout << "  misc dur #" << i << ": " << info.misc_durs.at(i).count()
+	            << "s" << std::endl;
+	}
 }
 
 void print_infos(ripser& ripser) {
