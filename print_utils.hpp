@@ -108,7 +108,7 @@ void print_v(compressed_sparse_matrix& v,
 	                            2 * pad + columns_to_reduce.size() + 10000);
 	buf[0] = '\0';
 	for(index_t row = 0; row < (index_t) columns_to_reduce.size(); ++row) {
-		index_t row_ele = get_index(columns_to_reduce.at(row));
+		index_diameter_t row_ele = columns_to_reduce.at(row);
 		for(index_t col = 0; col < (index_t) columns_to_reduce.size(); ++col) {
 			if(v.search_column(col, row_ele)) {
 				offs += sprint_element(buf + offs, 1, pad);
@@ -131,7 +131,7 @@ void print_vrow(compressed_sparse_matrix& v,
 	buf[0] = '\0';
 	for(index_t row = 0; row < (index_t) columns_to_reduce.size(); ++row) {
 		for(index_t col = 0; col < (index_t) columns_to_reduce.size(); ++col) {
-			index_t col_ele = get_index(columns_to_reduce.at(col));
+			index_diameter_t col_ele = columns_to_reduce.at(col);
 			if(v.search_column(row, col_ele)) {
 				offs += sprint_element(buf + offs, 1, pad);
 			} else {
@@ -189,8 +189,8 @@ void print_barcode(ripser& ripser, barcode& barcode) {
 	          barcode.hom_classes.end(),
 	          homology_class_order);
 	for(auto hc : barcode.hom_classes) {
-		value_t birth = std::max(0.0f, hc.birth);
-		value_t death = hc.death;
+		value_t birth = std::max(0.0f, get_diameter(hc.birth));
+		value_t death = get_diameter(hc.death);
 		std::cout << "[" << birth;
 		if(death == INF) {
 			std::cout << ", ) :: ";
@@ -212,7 +212,8 @@ void write_dim1_cycles(ripser& ripser, std::string filename) {
 	          homology_class_order);
 	std::ofstream ofs(filename, std::ofstream::trunc);
 	for(auto hc : barcode.hom_classes) {
-		ofs << "# " << std::max(0.0f, hc.birth) << " " << hc.death << std::endl;
+		ofs << "# " << std::max(0.0f, get_diameter(hc.birth)) << " "
+		     << get_diameter(hc.death) << std::endl;
 		std::vector<index_t> vertices(2, -1);
 		for(index_t simplex : hc.representative) {
 			ripser.get_simplex_vertices(simplex, 1, ripser.n, vertices);

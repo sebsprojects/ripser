@@ -115,6 +115,7 @@ void compute_pairs(ripser &ripser,
 	compressed_sparse_matrix v_inv; // Inverse of V (with possible replacement columns)
 	std::vector<std::pair<index_t, index_t>> nonessential_red;
 	size_t columns_to_reduce_curr_index = 0;
+	size_t total_pops = 0;
 	for(index_t j = 0; j < (index_t) columns.size(); ++j) { // For j in J
 		index_diameter_t column = columns.at(j);
 		index_diameter_t column_to_reduce = columns_to_reduce.at(columns_to_reduce_curr_index);
@@ -177,7 +178,8 @@ void compute_pairs(ripser &ripser,
 			//inversion_column.push_back(columns_to_reduce.at(columns_to_reduce_curr_index));
 			// Write R_j to reduced_cols
 			// Note: This if still may eval to true if we have essential index
-			if(get_index(pivot) != -1) {
+			// TODO: Is the dimension bound correct here?
+			if(get_index(pivot) != -1 && dim < std::min(ripser.dim_threshold, ripser.dim_max)) {
 				e = index_diameter_t(pivot);
 				std::vector<index_diameter_t> r_j;
 				// Additional pop pivot to remove 'diagonal' entry
@@ -194,12 +196,12 @@ void compute_pairs(ripser &ripser,
 				value_t death = get_diameter(pivot);
 				if(death > birth * ripser.ratio) {
 					// Non-essential pair
-					ripser.add_hom_class(dim, birth, death, std::vector<index_t>());
+					ripser.add_hom_class(dim, column_to_reduce, pivot, std::vector<index_t>());
 					// Store which non-essential hom class corresponds to which column
 					nonessential_red.push_back(std::make_pair(ripser.barcodes.at(dim).hom_classes.size() - 1, j));
 				}
 			} else {
-				ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
+				ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF), std::vector<index_t>());
 			}
 			info.reduction_dur += get_duration(reduction_start, get_time());
 			// TODO: Needs a cleaner solution
@@ -228,6 +230,7 @@ void compute_pairs(ripser &ripser,
 			v_inv.push_back(columns.at(j));
 		} else {
 			v_inv.append_column();
+			//if(inversion_column.size() > 0) std::cout << inversion_column.size() << std::endl;
 			for(index_diameter_t col_ele : inversion_column) {
 				// Binary search the column index of col_ele in columns
 				auto it = std::lower_bound(columns.begin(), columns.end(), col_ele, reverse_filtration_order);
@@ -245,31 +248,42 @@ void compute_pairs(ripser &ripser,
 					w.push(v_inv.get_entry(k));
 				}
 			}
+			if(inversion_type == 1) std::cout << "Size of w: " << w.size();
 			index_diameter_t e = pop_pivot(w);
+			size_t num_pops = 1;
 			while(get_index(e) != -1) {
 				v_inv.push_back(e);
 				e = pop_pivot(w);
+				num_pops++;
 			}
+			if(inversion_type == 1) std::cout << " vs #pops: " << num_pops << std::endl;
+			total_pops += num_pops;
 			// Push diagonal entry
 			v_inv.push_back(columns.at(j));
 		}
 		info.representative_dur += get_duration(rep_start, get_time());
 		info.misc_durs.at(inversion_type) += get_duration(rep_start, get_time());
 	}
+	if(dim == 1) std::cout << "TOTAL POPS: " << total_pops << std::endl;
 	//print_v(v_inv, columns);
 	// Assign the rows of v_inv correspoding to non-essential pairs to their
 	// respective homology class
 	for(index_t i = 0; i < (index_t) nonessential_red.size(); ++i) {
 		homology_class& h = ripser.barcodes.at(dim).hom_classes.at(nonessential_red.at(i).first);
 		index_t row_index = nonessential_red.at(i).second;
-		index_t row_simplex = get_index(columns.at(row_index));
+		std::cout << row_index << std::endl;
+		index_diameter_t row_simplex = columns.at(row_index);
 		// Go over all columns in v_inv and check if they contain row_simplex
 		// If yes, then add the column simplex to the representative
 		for(index_t k = 0; k < v_inv.size(); ++k) {
 			if(v_inv.search_column(k, row_simplex)) {
 				h.representative.push_back(get_index(columns.at(k)));
+				// print if the rep element comes from a column obtained
+				// by R_j (inversion_type=1, clearing-replacement)
+				//std::cout << (prev_reduced_cols.find(get_index(columns.at(k))) != prev_reduced_cols.end());
 			}
 		}
+		//std::cout << std::endl << std::endl;
 	}
 }
 

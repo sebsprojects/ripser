@@ -164,19 +164,33 @@ struct compressed_sparse_matrix {
 		return entries.at(column_start(col_index) + row_index);
 	}
 
-	bool search_column(const index_t col_index, index_t idx) {
-		for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
-			if(get_index(get_entry(i)) == idx) {
-				return true;
-			}
-			// TODO: Add break condition that uses the fact that the column (row)
-			// is ordered
+	bool search_column(const index_t col_index, const index_diameter_t el) {
+		if(column_start(col_index) == column_end(col_index)) {
+			return false;
 		}
-		return false;
+		auto it = std::lower_bound(entries.begin() + column_start(col_index),
+		                           entries.begin() + column_end(col_index),
+		                           el,
+		                           filtration_order);
+		bool found = it != entries.end() && *it == el;
+		return found;
+		// Linear time find:
+		//for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
+		//	if(get_entry(i) == el) {
+		//		if(!found) std::cout << "ERROR: 1 vs 0" << std::endl;
+		//		return true;
+		//	}
+		//}
+		//if(found) std::cout << "ERROR 0 vs 1: " << get_index(el) << " vs " << get_index(*it) << " at " << std::distance(entries.begin(), it) << " in " << column_start(col_index) << ", "<< column_end(col_index) << std::endl;
+		//return false;
 	}
 
 	index_t size() const {
 		return (index_t) bounds.size();
+	}
+
+	index_t get_total_size() const {
+		return (index_t) bounds.at(bounds.size() - 1);
 	}
 
 	void append_column() {
@@ -187,14 +201,6 @@ struct compressed_sparse_matrix {
 		assert(size() >= 0);
 		entries.push_back(idx);
 		++bounds.back();
-	}
-
-	void push_at(const index_t col_index, index_diameter_t idx) {
-		// TODO: insert is very inefficient for std::vector
-		entries.insert(entries.begin() + column_end(col_index), idx);
-		for(index_t i = col_index; i < size(); i++) {
-			++bounds.at(i);
-		}
 	}
 };
 
@@ -240,11 +246,11 @@ typedef std::unordered_map<index_t,
  * *************************************************************************/
 
 struct homology_class {
-	value_t birth;
-	value_t death;
+	index_diameter_t birth;
+	index_diameter_t death;
 	std::vector<index_t> representative;
 
-	homology_class(value_t _birth, value_t _death, std::vector<index_t> rep)
+	homology_class(index_diameter_t _birth, index_diameter_t _death, std::vector<index_t> rep)
 		: birth(_birth),
 		  death(_death),
 		  representative(rep)
@@ -266,7 +272,9 @@ bool barcode_order(const barcode& a, const barcode& b) {
 }
 
 bool homology_class_order(homology_class& a, homology_class& b) {
-	return (a.birth < b.birth) || (a.birth == b.birth && a.death < b.death );
+	return (get_diameter(a.birth) < get_diameter(b.birth)) ||
+	       (get_diameter(a.birth) == get_diameter(b.birth) &&
+	        get_diameter(a.death) < get_diameter(b.death));
 }
 
 typedef std::chrono::steady_clock::time_point time_point;
@@ -378,7 +386,7 @@ struct ripser {
 		return diam;
 	}
 
-	void add_hom_class(index_t dim, value_t birth, value_t death, std::vector<index_t> rep) {
+	void add_hom_class(index_t dim, index_diameter_t birth, index_diameter_t death, std::vector<index_t> rep) {
 		barcodes.at(dim).hom_classes.push_back(homology_class(birth, death, rep));
 	}
 };

@@ -179,8 +179,7 @@ void compute_cohomology(ripser &ripser,
 			// Non-essential pair. Get's ignored for output here
 		} else {
 			// Essential index (since clearing)
-			value_t birth = get_diameter(column_to_reduce);
-			ripser.add_hom_class(dim, birth, INF, std::vector<index_t>());
+			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF), std::vector<index_t>());
 		}
 	}
 	time_point reduction_end = get_time();
@@ -249,7 +248,7 @@ void compute_homology(ripser &ripser,
 				while(!working_boundary.empty()) {
 					rep.push_back(get_index(pop_pivot(working_boundary)));
 				}
-				ripser.add_hom_class(dim - 1, birth, death, rep);
+				ripser.add_hom_class(dim - 1, pivot, column_to_reduce, rep);
 			}
 		} else {
 			// This case will not occur since we only do the reduction
