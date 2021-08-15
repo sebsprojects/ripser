@@ -95,8 +95,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 		while(cofacets.has_next(false)) {
 			index_diameter_t cofacet = cofacets.next();
 			// Threshold check
-			next_simplices.push_back(cofacet);
 			if(get_diameter(cofacet) <= ripser.threshold) {
+				next_simplices.push_back(cofacet);
 				// Clearing check
 				if(pivot_column_index.find(get_index(cofacet)) ==
 				   pivot_column_index.end()) {

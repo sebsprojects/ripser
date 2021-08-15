@@ -1,4 +1,4 @@
-all: ripser_hrep_hom_ref ripser_hrep_hom ripser_hrep_hom_clearing ripser_hrep_hom_cohom ripser_hrep_cohom_inverse ripser_hrep_cohom_inverse_clearing ripser_hrep_cohom_row
+all: ripser_hrep_cohom_hom ripser_hrep_cohom_inverse_forwardsubs
 
 ripser_hrep_hom_ref: ripser_hrep_hom_ref.cpp
 	c++ -std=c++11 -Wall ripser_hrep_hom_ref.cpp -o ripser_hrep_hom_ref -g

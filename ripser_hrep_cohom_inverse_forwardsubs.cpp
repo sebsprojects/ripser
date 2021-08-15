@@ -48,13 +48,6 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 	return get_pivot(working_coboundary);
 }
 
-// Takes a vector of (dim-1)-simplices as input and sets columns_to_reduce
-// to contain all cofacets of those simplices
-// ordered column indices (indexed by dim-simplices) of the coboundary matrix
-// Sets simplices to contain all dim-simplices
-//
-// Clearing: We take the pivots from the reduction in dim-1 and ignore columns
-// that appeared as a pivot
 void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& simplices,
                                 std::vector<index_diameter_t>& columns_to_reduce,
@@ -215,26 +208,55 @@ void compute_reps(ripser& ripser,
 					// Apparent, does not contribute
 				} else {
 					// Clearing
+					auto lb = rcit->second.begin();
 					for(index_t k = 0; k < (index_t) rep.size(); k++) {
 						// TODO: r_j could be empty
-						auto itk = std::lower_bound(rcit->second.begin(),
-						                            rcit->second.end(),
-						                            rep.at(k),
-						                            filtration_order);
-						parity += (itk != rcit->second.end() && *itk == rep.at(k));
+						index_t rep_index = rep.size() - k - 1;
+						lb = std::lower_bound(lb,
+						                      rcit->second.end(),
+						                      rep.at(rep_index),
+						                      filtration_order);
+						//std::cout << "r: " << get_index(rep.at(k)) << ", "
+						//            << get_index(simplices.at(j)) << std::endl;
+						if(lb != rcit->second.end() && *lb == rep.at(rep_index)) {
+							parity += 1;
+							std::advance(lb, 1);
+						}
 						// Linear time find:
-						//parity += (std::find(r_j.begin(), r_j.end(), rep.at(k)) != r_j.end());
+						//parity += (std::find(rcit->second.begin(), rcit->second.end(), rep.at(k)) != rcit->second.end());
+					}
+					if(parity % 2 == 1) {
+						rep.push_back(simplices.at(j));
 					}
 				}
 			} else {
 				// Reduction Matrix
 				index_t reduction_column_index = index_lookup.at(j);
-				for(index_t k = 0; k < (index_t) rep.size(); k++) {
-					parity += reduction_matrix.search_column(reduction_column_index, rep.at(k));
+				if(reduction_matrix.column_start(reduction_column_index) ==
+				   reduction_matrix.column_end(reduction_column_index)) {
+					// Column with only diagonal entry
+					continue;
 				}
-			}
-			if(parity % 2 == 1) {
-				rep.push_back(simplices.at(j));
+				auto lb = reduction_matrix.entries.begin() +
+				          reduction_matrix.column_start(reduction_column_index);
+				auto ent_end = reduction_matrix.entries.begin() +
+				               reduction_matrix.column_end(reduction_column_index);
+				for(index_t k = 0; k < (index_t) rep.size(); k++) {
+					index_t rep_index = rep.size() - k - 1;
+					lb = std::lower_bound(lb,
+					                      ent_end,
+					                      rep.at(rep_index),
+					                      filtration_order);
+					if(lb != ent_end && *lb == rep.at(rep_index)) {
+						parity += 1;
+						std::advance(lb, 1);
+					}
+					// Linear time find:
+					//parity += reduction_matrix.search_column(reduction_column_index, rep.at(k));
+				}
+				if(parity % 2 == 1) {
+					rep.push_back(simplices.at(j));
+				}
 			}
 		}
 		for(auto el : rep) {
@@ -324,7 +346,7 @@ int main(int argc, char** argv) {
 		std::string fn_pre = "./output/cycle_rep_dim1/";
 		std::string fn = filename.substr(filename.find_last_of("/") + 1);
 		fn = fn.substr(0, fn.find_last_of("."));
-		std::string fn_post = "_cohom_inv_clearing.txt";
+		std::string fn_post = "_cohom_inv_forward.txt";
 		write_dim1_cycles(ripser, fn_pre + fn + fn_post);
 	}
 	exit(0);

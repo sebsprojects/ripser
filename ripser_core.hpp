@@ -165,24 +165,13 @@ struct compressed_sparse_matrix {
 	}
 
 	bool search_column(const index_t col_index, const index_diameter_t el) {
-		if(column_start(col_index) == column_end(col_index)) {
-			return false;
-		}
-		auto it = std::lower_bound(entries.begin() + column_start(col_index),
-		                           entries.begin() + column_end(col_index),
-		                           el,
-		                           filtration_order);
-		bool found = it != entries.end() && *it == el;
-		return found;
 		// Linear time find:
-		//for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
-		//	if(get_entry(i) == el) {
-		//		if(!found) std::cout << "ERROR: 1 vs 0" << std::endl;
-		//		return true;
-		//	}
-		//}
-		//if(found) std::cout << "ERROR 0 vs 1: " << get_index(el) << " vs " << get_index(*it) << " at " << std::distance(entries.begin(), it) << " in " << column_start(col_index) << ", "<< column_end(col_index) << std::endl;
-		//return false;
+		for(index_t i = column_start(col_index); i < column_end(col_index); ++i) {
+			if(get_entry(i) == el) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	index_t size() const {
@@ -204,12 +193,23 @@ struct compressed_sparse_matrix {
 	}
 };
 
-compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_stream) {
+compressed_lower_distance_matrix read_distance_matrix(std::istream& input_stream) {
+	//std::vector<value_t> distances;
+	//value_t value;
+	//while (input_stream >> value) {
+	//	distances.push_back(value);
+	//	input_stream.ignore();
+	//}
+	//return compressed_lower_distance_matrix(std::move(distances));
 	std::vector<value_t> distances;
+	std::string line;
 	value_t value;
-	while (input_stream >> value) {
-		distances.push_back(value);
-		input_stream.ignore();
+	for (int i = 0; std::getline(input_stream, line); ++i) {
+		std::istringstream s(line);
+		for (int j = 0; j < i && s >> value; ++j) {
+			distances.push_back(value);
+			s.ignore();
+		}
 	}
 	return compressed_lower_distance_matrix(std::move(distances));
 }
