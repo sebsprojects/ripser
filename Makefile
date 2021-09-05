@@ -1,4 +1,4 @@
-all: ripser_hrep_cohom_hom ripser_hrep_cohom_inverse_forwardsubs
+all: ripser_hrep_cohom_hom ripser_hrep_cohom_inverse_forwardsubs ripser_hrep_cohom_inverse_implicit
 
 ripser_hrep_hom_ref: ripser_hrep_hom_ref.cpp
 	c++ -std=c++11 -Wall ripser_hrep_hom_ref.cpp -o ripser_hrep_hom_ref -g
@@ -18,9 +18,11 @@ ripser_hrep_cohom_inverse: ripser_hrep_cohom_inverse.cpp
 ripser_hrep_cohom_inverse_clearing: ripser_hrep_cohom_inverse_clearing.cpp
 	c++ -std=c++11 -Wall ripser_hrep_cohom_inverse_clearing.cpp -o ripser_hrep_cohom_inverse_clearing -g
 
-
 ripser_hrep_cohom_inverse_forwardsubs: ripser_hrep_cohom_inverse_forwardsubs.cpp
 	c++ -std=c++11 -Wall ripser_hrep_cohom_inverse_forwardsubs.cpp -o ripser_hrep_cohom_inverse_forwardsubs -g
 
+ripser_hrep_cohom_inverse_implicit: ripser_hrep_cohom_inverse_implicit.cpp
+	c++ -std=c++11 -Wall ripser_hrep_cohom_inverse_implicit.cpp -o ripser_hrep_cohom_inverse_implicit -g
+
 clean:
-	rm -f ripser_hrep_hom_ref ripser_hrep_hom ripser_hrep_hom_clearing ripser_hrep_cohom_hom ripser_hrep_cohom_inverse ripser_hrep_cohom_inverse_clearing ripser_hrep_cohom_inverse_forwardsubs
+	rm -f ripser_hrep_hom_ref ripser_hrep_hom ripser_hrep_hom_clearing ripser_hrep_cohom_hom ripser_hrep_cohom_inverse ripser_hrep_cohom_inverse_clearing ripser_hrep_cohom_inverse_forwardsubs ripser_hrep_cohom_inverse_implicit

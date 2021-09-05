@@ -90,13 +90,9 @@ void assemble_columns_to_reduce(ripser &ripser,
 	info.simplex_reduction_count = columns_to_reduce.size();
 }
 
-typedef std::unordered_map<index_t,
-                           std::vector<index_diameter_t>> column_hash_map;
-
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
-                   column_hash_map& reduced_cols,
                    compressed_sparse_matrix& reduction_matrix,
                    const index_t dim) {
 	info& info = ripser.infos.at(dim);
@@ -151,29 +147,14 @@ void compute_pairs(ripser &ripser,
 			reduction_matrix.push_back(e);
 			e = pop_pivot(working_reduction_column);
 		}
-		// Write R_j to reduced_cols
-		index_t red_eles = -1;
-		if(get_index(pivot) != -1 &&
-		   dim < std::min(ripser.dim_threshold, ripser.dim_max)) {
-			e = index_diameter_t(pivot);
-			std::vector<index_diameter_t> r_j;
-			// Additional pop pivot to remove 'diagonal' entry
-			e = pop_pivot(working_coboundary);
-			while(get_index(e) != -1) {
-				r_j.push_back(e);
-				e = pop_pivot(working_coboundary);
-			}
-			reduced_cols.insert({get_index(pivot), r_j});
-			red_eles = r_j.size();
-		}
-		ripser.complete_reduction_record(dim, get_time(), add_count, app_count, red_eles);
+		ripser.complete_reduction_record(dim, get_time(), add_count, app_count, working_coboundary.size());
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			// Non-essential index
-			ripser.add_hom_class(dim, column_to_reduce, pivot, std::vector<index_t>());
+			ripser.add_hom_class(dim, column_to_reduce, pivot);
 		} else {
 			// Essential index (since clearing)
-			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF), std::vector<index_t>());
+			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF));
 		}
 	}
 	info.reduction_dur = get_duration(reduction_start, get_time());
@@ -181,94 +162,53 @@ void compute_pairs(ripser &ripser,
 
 void compute_reps(ripser& ripser,
                   std::vector<index_diameter_t>& simplices,
-                  std::vector<index_diameter_t>& columns_to_reduce,
-                  compressed_sparse_matrix& reduction_matrix,
-                  column_hash_map& reduced_columns,
-                  index_t dim) {
-	// Compute a lookup tabel that maps the indices of simplices to either
-	//   > the column index in reduction matrix
-	//   > -1, if the column was either cleared or apprent (we do not know yet)
+                  std::vector<index_diameter_t>& ctrdm1,
+                  std::vector<index_diameter_t>& ctrd,
+                  compressed_sparse_matrix& Vdm1,
+                  compressed_sparse_matrix& Vd,
+	              entry_hash_map& pcidm1,
+	              index_t dim) {
 	time_point rep_start = get_time();
-	index_t ind = 0;
-	std::vector<index_t> index_lookup;
-	for(index_t i = 0; i < (index_t) simplices.size(); ++i) {
-		if(ind < (index_t) columns_to_reduce.size() && simplices.at(i) == columns_to_reduce.at(ind)) {
-			index_lookup.push_back(ind);
-			ind++;
-		} else {
-			index_lookup.push_back(-1);
-		}
-	}
-	for(index_t i = 0; i < (index_t) ripser.barcodes.at(dim).hom_classes.size(); ++i) {
-		index_diameter_t birth = ripser.barcodes.at(dim).hom_classes.at(i).birth;
-		// Get the birth simplex index in simplices
-		auto it = std::lower_bound(simplices.begin(), simplices.end(), birth,
-		                           reverse_filtration_order);
-		index_t column_index = std::distance(simplices.begin(), it);
-		std::vector<index_diameter_t> rep;
-		rep.push_back(birth); // j = column_index
-		//std::cout << column_index << ": ";
-		for(index_t j = column_index + 1; j < (index_t) simplices.size(); j++) {
-			index_t parity = 0;
-			if(index_lookup.at(j) == -1) {
-				auto rcit = reduced_columns.find(get_index(simplices.at(j)));
-				if(rcit == reduced_columns.end()) {
-					// Apparent, does not contribute
-				} else {
-					// Clearing
-					auto lb = rcit->second.begin();
-					for(index_t k = 0; k < (index_t) rep.size(); k++) {
-						// TODO: r_j could be empty
-						index_t rep_index = rep.size() - k - 1;
-						lb = std::lower_bound(lb,
-						                      rcit->second.end(),
-						                      rep.at(rep_index),
-						                      filtration_order);
-						//std::cout << "r: " << get_index(rep.at(k)) << ", "
-						//            << get_index(simplices.at(j)) << std::endl;
-						if(lb != rcit->second.end() && *lb == rep.at(rep_index)) {
-							parity += 1;
-							std::advance(lb, 1);
-						}
-						// Linear time find:
-						//parity += (std::find(rcit->second.begin(), rcit->second.end(), rep.at(k)) != rcit->second.end());
-					}
-					if(parity % 2 == 1) {
-						rep.push_back(simplices.at(j));
-					}
+	std::vector<homology_class> hom_classes = ripser.barcodes.at(dim).hom_classes;
+	std::vector<homology_class> active_hom_classes;
+	index_t hom_class_index = 0;
+	index_diameter_t min_simplex;
+	index_t ctr_index = 0;
+	std::sort(hom_classes.begin(), hom_classes.end(), homology_class_order);
+	for(index_t j = 0; j < simplices.size(); j++) {
+		if(active_hom_classes.empty() && false) { // apparent pair check
+			Column Vt_row;
+			if(false) { // cleared, need to compute Rj as replacemenet
+				index_t ctrdm1_index = pcidm1.find(get_index(simplex))->second;
+			} else { // need Vj
+				for(index_t l = Vd.column_end(ctr_index) - 1;
+				    l >= Vd.column_start(ctr_index);
+				    l--) {
+					index_diameter_t v_ele = Vd.get_entry(l);
+					// TODO: We do not need all elements from Vd
+					// TODO: We know that Vd is sorted, maybe push can be faster
+					//if(reverse_filtration_order(min_simplex, v_ele) || min_simplex == v_ele) {
+					Vt_row.push(v_ele);
+					//}
 				}
-			} else {
-				// Reduction Matrix
-				index_t reduction_column_index = index_lookup.at(j);
-				if(reduction_matrix.column_start(reduction_column_index) ==
-				   reduction_matrix.column_end(reduction_column_index)) {
-					// Column with only diagonal entry
-					continue;
-				}
-				auto lb = reduction_matrix.entries.begin() +
-				          reduction_matrix.column_start(reduction_column_index);
-				auto ent_end = reduction_matrix.entries.begin() +
-				               reduction_matrix.column_end(reduction_column_index);
-				for(index_t k = 0; k < (index_t) rep.size(); k++) {
-					index_t rep_index = rep.size() - k - 1;
-					lb = std::lower_bound(lb,
-					                      ent_end,
-					                      rep.at(rep_index),
-					                      filtration_order);
-					if(lb != ent_end && *lb == rep.at(rep_index)) {
-						parity += 1;
-						std::advance(lb, 1);
-					}
-					// Linear time find:
-					//parity += reduction_matrix.search_column(reduction_column_index, rep.at(k));
-				}
-				if(parity % 2 == 1) {
-					rep.push_back(simplices.at(j));
+			}
+			for(auto hom_class : active_hom_classes) {
+				// Compute the dot-product (representative * j_row)
+				for(index_t k = hom_class.representative.size() - 1; k >= 0; k--) {
+					index_diameter_t rep_ele = hom_class.representative.at(k);
 				}
 			}
 		}
-		for(auto el : rep) {
-			ripser.barcodes.at(dim).hom_classes.at(i).representative.push_back(get_index(el));
+		if(ctrd.at(ctr_index) == simplices.at(j)) {
+			ctr_index++;
+		}
+		if(simplices.at(j) == hom_classes.at(hom_class_index).birth) {
+			//if(active_hom_classes.empty()) {
+			//	min_simplex = simplices.at(j);
+			//}
+			active_hom_classes.push_back(hom_classes.at(hom_class_index));
+			active_hom_classes.at(hom_class_index).representative.push_back(simplices.at(j));
+			hom_class_index++;
 		}
 	}
 	ripser.infos.at(dim).representative_dur += get_duration(rep_start, get_time());
@@ -277,18 +217,17 @@ void compute_reps(ripser& ripser,
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
 	entry_hash_map pivot_column_index;
-	column_hash_map prev_red_cols;
-	column_hash_map red_cols;
 	for(index_t i = 0; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
 	}
 	ripser.infos.at(0).simplex_total_count = simplices.size();
 	ripser.infos.at(0).simplex_reduction_count = simplices.size();
+	compressed_sparse_matrix Vdm1;
+	compressed_sparse_matrix Vd;
 	index_t last_dim = std::min(ripser.dim_threshold, ripser.dim_max);
 	for(index_t dim = 0; dim <= last_dim; ++dim) {
 		std::vector<index_diameter_t> columns_to_reduce;
-		compressed_sparse_matrix reduction_matrix;
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
 		} else {
@@ -301,21 +240,19 @@ void compute_barcodes(ripser& ripser) {
 		}
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
-		red_cols.clear();
-		red_cols.reserve(columns_to_reduce.size());
 		compute_pairs(ripser,
 		              columns_to_reduce,
 		              pivot_column_index,
-		              red_cols,
-		              reduction_matrix,
+		              Vd,
 		              dim);
 		compute_reps(ripser,
 		             simplices,
 		             columns_to_reduce,
-		             reduction_matrix,
-		             prev_red_cols,
+		             Vdm1,
+		             Vd,
 		             dim);
-		prev_red_cols.swap(red_cols);
+		Vdm1 = Vd;
+		Vd = compressed_sparse_matrix();
 	}
 }
 

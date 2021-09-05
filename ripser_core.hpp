@@ -248,9 +248,9 @@ typedef std::unordered_map<index_t,
 struct homology_class {
 	index_diameter_t birth;
 	index_diameter_t death;
-	std::vector<index_t> representative;
+	std::vector<index_diameter_t> representative;
 
-	homology_class(index_diameter_t _birth, index_diameter_t _death, std::vector<index_t> rep)
+	homology_class(index_diameter_t _birth, index_diameter_t _death, std::vector<index_diameter_t> rep)
 		: birth(_birth),
 		  death(_death),
 		  representative(rep)
@@ -271,14 +271,33 @@ bool barcode_order(const barcode& a, const barcode& b) {
 	return a.dim < b.dim;
 }
 
-bool homology_class_order(homology_class& a, homology_class& b) {
+bool homology_class_print_order(homology_class& a, homology_class& b) {
 	return (get_diameter(a.birth) < get_diameter(b.birth)) ||
 	       (get_diameter(a.birth) == get_diameter(b.birth) &&
 	        get_diameter(a.death) < get_diameter(b.death));
 }
 
+bool homology_class_order(homology_class& a, homology_class& b) {
+	return reverse_filtration_order(a.birth, b.birth);
+}
+
 typedef std::chrono::steady_clock::time_point time_point;
 typedef std::chrono::duration<double> duration;
+
+struct reduction_record {
+	index_t j;
+	time_point start;
+	time_point end;
+	index_t addition_count;
+	index_t addition_apparent_count;
+	index_t coboundary_element_count;
+
+	reduction_record(index_t _j, time_point _start)
+		: j(_j), start(_start), end(), addition_count(), addition_apparent_count(),
+		  coboundary_element_count()
+	{
+	}
+};
 
 struct info {
 	index_t dim;
@@ -293,6 +312,7 @@ struct info {
 	duration representative_dur;
 
 	std::vector<duration> misc_durs;
+	std::vector<reduction_record> red_records;
 
 	info(index_t _dim)
 		: dim(_dim), clearing_count(0), emergent_count(0), apparent_count(0),
@@ -386,8 +406,31 @@ struct ripser {
 		return diam;
 	}
 
-	void add_hom_class(index_t dim, index_diameter_t birth, index_diameter_t death, std::vector<index_t> rep) {
+	void add_hom_class(index_t dim, index_diameter_t birth, index_diameter_t death, std::vector<index_diameter_t> rep = std::vector<index_diameter_t>()) {
 		barcodes.at(dim).hom_classes.push_back(homology_class(birth, death, rep));
+	}
+
+	void add_reduction_record(index_t dim, index_t j, time_point start) {
+		infos.at(dim).red_records.push_back(reduction_record(j, start));
+		std::cout << "  "
+		          << (j+1) << "/"
+		          << infos.at(dim).simplex_reduction_count << std::flush;
+	}
+
+	void complete_reduction_record(index_t dim, time_point end,
+	                               index_t add_count,
+	                               index_t add_app_count,
+	                               index_t coboundary_count) {
+		reduction_record& rec = infos.at(dim).red_records.back();
+		rec.end = end;
+		rec.addition_count = add_count;
+		rec.addition_apparent_count = add_app_count;
+		rec.coboundary_element_count = coboundary_count;
+		index_t ms = (index_t) (get_duration(rec.start, end).count() * 1000.0);
+		std::cout << " :: tim=(" << ms << "ms)"
+		          << " :: add=(" << add_count << "/" << add_app_count << ")"
+		          << " :: ele=" << coboundary_count
+		          << std::endl;
 	}
 };
 
@@ -610,12 +653,12 @@ void add_boundary(ripser& ripser,
                   Column& working_boundary) {
 	//TODO(seb): Do we need the correct diameter here?
 	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add));
+	// Computation of R_j due to implicit reduction
 	add_simplex_boundary(ripser,
 	                     column_to_add,
 	                     dim,
 	                     working_reduction_column,
 	                     working_boundary);
-	// Computation of R_j due to implicit reduction
 	for(index_t i = reduction_matrix.column_start(index_column_to_add);
 	    i < reduction_matrix.column_end(index_column_to_add);
 	    ++i) {

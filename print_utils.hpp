@@ -197,8 +197,8 @@ void print_barcode(ripser& ripser, barcode& barcode) {
 		} else {
 			std::cout << "," << death << ") :: ";
 		}
-		for(index_t simp : hc.representative) {
-			print_simplex(ripser, simp, barcode.dim);
+		for(index_diameter_t simp : hc.representative) {
+			print_simplex(ripser, get_index(simp), barcode.dim);
 			std::cout << " ";
 		}
 		std::cout << std::endl;
@@ -215,8 +215,8 @@ void write_dim1_cycles(ripser& ripser, std::string filename) {
 		ofs << "# " << std::max(0.0f, get_diameter(hc.birth)) << " "
 		     << get_diameter(hc.death) << std::endl;
 		std::vector<index_t> vertices(2, -1);
-		for(index_t simplex : hc.representative) {
-			ripser.get_simplex_vertices(simplex, 1, ripser.n, vertices);
+		for(index_diameter_t simplex : hc.representative) {
+			ripser.get_simplex_vertices(get_index(simplex), 1, ripser.n, vertices);
 			ofs << vertices.at(0) << " " << vertices.at(1) << std::endl;
 		}
 		ofs << std::endl;
