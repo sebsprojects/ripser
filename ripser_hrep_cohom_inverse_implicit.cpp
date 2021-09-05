@@ -160,6 +160,24 @@ void compute_pairs(ripser &ripser,
 	info.reduction_dur = get_duration(reduction_start, get_time());
 }
 
+void add_partial_simplex_coboundary(ripser& ripser,
+                                    index_diameter_t simplex,
+                                    index_diameter_t min_simplex,
+                                    Column& coboundary,
+                                    index_t dim)
+{
+	simplex_coboundary_enumerator cofacets(ripser);
+	cofacets.set_simplex(simplex, dim);
+	while(cofacets.has_next()) {
+		index_diameter_t cofacet = cofacets.next();
+		if(get_diameter(cofacet) <= ripser.threshold
+		   && !reverse_filtration_order(cofacet, min_simplex))
+		{
+			coboundary.push(cofacet);
+		}
+	}
+}
+
 void compute_reps(ripser& ripser,
                   std::vector<index_diameter_t>& simplices,
                   std::vector<index_diameter_t>& ctrdm1,
@@ -176,20 +194,37 @@ void compute_reps(ripser& ripser,
 	index_t ctr_index = 0;
 	std::sort(hom_classes.begin(), hom_classes.end(), homology_class_order);
 	for(index_t j = 0; j < simplices.size(); j++) {
-		if(active_hom_classes.empty() && false) { // apparent pair check
+		if(active_hom_classes.empty()) {
 			Column Vt_row;
-			if(false) { // cleared, need to compute Rj as replacemenet
-				index_t ctrdm1_index = pcidm1.find(get_index(simplex))->second;
-			} else { // need Vj
+			if(ctrd.at(ctr_index) == simplices.at(j)) { // Use V column
 				for(index_t l = Vd.column_end(ctr_index) - 1;
 				    l >= Vd.column_start(ctr_index);
-				    l--) {
+				    l--)
+				{
 					index_diameter_t v_ele = Vd.get_entry(l);
 					// TODO: We do not need all elements from Vd
 					// TODO: We know that Vd is sorted, maybe push can be faster
 					//if(reverse_filtration_order(min_simplex, v_ele) || min_simplex == v_ele) {
 					Vt_row.push(v_ele);
 					//}
+				}
+			} else {
+				// V column missing, check if it was cleared, if not it is
+				// an apparent pair index and can be ignored
+				auto pair = pcidm1.find(get_index(simplices.at(j)));
+				if(pair != pcidm1.end()) {
+					index_t vdm1_index = pair->second;
+					// Add diagonal entry
+					add_partial_simplex_coboundary(ripser, ctrdm1.at(vdm1_index), min_simplex, Vt_row, dim - 1);
+					// Add remaining entries
+					if(Vdm1.column_start(vdm1_index) == Vdm1.column_end(vdm1_index)) {
+						for(index_t l = Vdm1.column_end(vdm1_index) - 1;
+							l >= Vdm1.column_start(vdm1_index);
+							l--) {
+							index_diameter_t v_ele = Vd.get_entry(l);
+							add_partial_simplex_coboundary(ripser, v_ele, min_simplex, Vt_row, dim - 1);
+						}
+					}
 				}
 			}
 			for(auto hom_class : active_hom_classes) {
