@@ -190,12 +190,15 @@ void compute_reps(ripser& ripser,
 	time_point rep_start = get_time();
 	std::vector<homology_class>& hom_classes = ripser.barcodes.at(dim).hom_classes;
 	std::vector<index_t> active_hom_classes;
-	std::vector<index_t> hom_parity;
+	std::vector<index_t> hom_parities(hom_classes.size(), 0);
+	std::vector<index_t> hom_offs(hom_classes.size(), 0);
 	index_t hom_class_index = 0;
 	index_diameter_t min_simplex;
 	index_t ctr_index = 0;
 	std::sort(hom_classes.begin(), hom_classes.end(), homology_class_order);
+	index_t n = simplices.size();
 	for(index_t j = 0; j < simplices.size(); j++) {
+		std::cout << "  " << j << "/" << n << std::flush;
 		if(!active_hom_classes.empty()) {
 			Column Vt_row;
 			if(ctrd.at(ctr_index) == simplices.at(j)) { // Use V column
@@ -214,6 +217,7 @@ void compute_reps(ripser& ripser,
 							Vt_row.push(v_ele);
 						}
 					}
+					std::cout << " :: V=" << Vt_row.size() << std::flush;
 				}
 			} else {
 				// V column missing, check if it was cleared, if not it is
@@ -232,29 +236,39 @@ void compute_reps(ripser& ripser,
 							add_partial_simplex_coboundary(ripser, v_ele, min_simplex, Vt_row, dim - 1);
 						}
 					}
+					std::cout << " :: R=" << Vt_row.size() << std::flush;
 				}
 			}
-			for(index_t active_index : active_hom_classes) {
-				// Compute the dot-product (representative * j_row)
-				homology_class& hom_class = hom_classes.at(active_index);
-				index_t parity = 0;
-				for(index_t k = ((index_t) hom_class.representative.size()) - 1; k >= 0; k--) {
-					Column Vt_row_copy = Vt_row;
-					index_diameter_t rep_ele = hom_class.representative.at(k);
-					index_diameter_t v_ele = pop_pivot(Vt_row_copy);
-					while(get_index(v_ele) != -1) {
-						//if(!reverse_filtration_order(rep_ele, v_ele)) {
+			std::cout << std::endl;
+			index_diameter_t v_ele = pop_pivot(Vt_row);
+			while(get_index(v_ele) != -1) {
+				for(index_t k = 0; k < active_hom_classes.size(); k++) {
+					std::vector<index_diameter_t>& rep = hom_classes[active_hom_classes[k]].representative;
+					// Still elements in rep left to work with?
+					index_t rep_index = ((index_t) rep.size()) - 1 - hom_offs[k];
+					while(rep_index >= 0) {
+						index_diameter_t rep_ele = rep[rep_index];
+						// check if !(v_ele < rep_ele) equal to (rep_ele >= v_ele)
+						if(!reverse_filtration_order(v_ele, rep_ele)) {
 							if(rep_ele == v_ele) {
-								parity++;
-						//	}
-						//	break;
+								hom_parities[k] += 1;
+							}
+							break;
+						} else {
+							// v_ele < rep_ele
+							hom_offs[k] += 1;
+							rep_index--;
 						}
-						v_ele = pop_pivot(Vt_row_copy);
 					}
 				}
-				if(parity % 2 == 1) {
-					hom_class.representative.push_back(simplices.at(j));
+				v_ele = pop_pivot(Vt_row);
+			}
+			for(index_t k = 0; k < active_hom_classes.size(); k++) {
+				if(hom_parities.at(k) % 2 == 1) {
+					hom_classes[active_hom_classes[k]].representative.push_back(simplices[j]);
 				}
+				hom_parities[k] = 0;
+				hom_offs[k] = 0;
 			}
 		}
 		if(ctr_index < ((index_t) ctrd.size()) - 1 && ctrd.at(ctr_index) == simplices.at(j)) {

@@ -353,7 +353,7 @@ struct ripser {
 		  ratio(_ratio),
 		  binomial_coeff(n, dim_max + 2),
 		  barcodes(std::vector<barcode>()),
-		  print_progress(false)
+		  print_progress(true)
 	{
 		for(index_t i = 0; i <= dim_threshold; ++i) {
 			barcodes.push_back(barcode(i));
