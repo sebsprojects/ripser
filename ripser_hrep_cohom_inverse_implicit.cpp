@@ -171,7 +171,7 @@ void add_partial_simplex_coboundary(ripser& ripser,
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
 		if(get_diameter(cofacet) <= ripser.threshold
-		   //&& !reverse_filtration_order(cofacet, min_simplex)
+		   && !reverse_filtration_order(cofacet, min_simplex)
 		   )
 		{
 			coboundary.push(cofacet);
@@ -190,6 +190,7 @@ void compute_reps(ripser& ripser,
 	time_point rep_start = get_time();
 	std::vector<homology_class>& hom_classes = ripser.barcodes.at(dim).hom_classes;
 	std::vector<index_t> active_hom_classes;
+	std::vector<index_t> hom_parity;
 	index_t hom_class_index = 0;
 	index_diameter_t min_simplex;
 	index_t ctr_index = 0;
@@ -209,9 +210,9 @@ void compute_reps(ripser& ripser,
 						index_diameter_t v_ele = Vd.get_entry(l);
 						// TODO: We do not need all elements from Vd
 						// TODO: We know that Vd is sorted, maybe push can be faster
-						//if(!reverse_filtration_order(v_ele, min_simplex)) {
+						if(!reverse_filtration_order(v_ele, min_simplex)) {
 							Vt_row.push(v_ele);
-						//}
+						}
 					}
 				}
 			} else {
@@ -223,11 +224,11 @@ void compute_reps(ripser& ripser,
 					// Add diagonal entry
 					add_partial_simplex_coboundary(ripser, ctrdm1.at(vdm1_index), min_simplex, Vt_row, dim - 1);
 					// Add remaining entries
-					if(Vdm1.column_start(vdm1_index) == Vdm1.column_end(vdm1_index)) {
+					if(Vdm1.column_start(vdm1_index) != Vdm1.column_end(vdm1_index)) {
 						for(index_t l = Vdm1.column_end(vdm1_index) - 1;
 							l >= Vdm1.column_start(vdm1_index);
 							l--) {
-							index_diameter_t v_ele = Vd.get_entry(l);
+							index_diameter_t v_ele = Vdm1.get_entry(l);
 							add_partial_simplex_coboundary(ripser, v_ele, min_simplex, Vt_row, dim - 1);
 						}
 					}
@@ -317,7 +318,7 @@ void compute_barcodes(ripser& ripser) {
 		             dim);
 		// Move the data structures
 		Vdm1.bounds = std::move(Vd.bounds);
-		Vdm1.entries = std::move(Vdm1.entries);
+		Vdm1.entries = std::move(Vd.entries);
 		ctrdm1 = std::move(columns_to_reduce);
 		// Clear the expired data structures
 		Vd.bounds.clear();
