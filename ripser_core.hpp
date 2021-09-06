@@ -342,6 +342,7 @@ struct ripser {
 	// Output
 	mutable std::vector<barcode> barcodes;
 	mutable std::vector<info> infos;
+	bool print_progress;
 
 	ripser(DistanceMatrix&& _dist, index_t _dim_max, index_t _dim_threshold, value_t _threshold, float _ratio)
 		: dist(std::move(_dist)),
@@ -351,7 +352,8 @@ struct ripser {
 		  threshold(_threshold),
 		  ratio(_ratio),
 		  binomial_coeff(n, dim_max + 2),
-		  barcodes(std::vector<barcode>())
+		  barcodes(std::vector<barcode>()),
+		  print_progress(false)
 	{
 		for(index_t i = 0; i <= dim_threshold; ++i) {
 			barcodes.push_back(barcode(i));
@@ -412,9 +414,11 @@ struct ripser {
 
 	void add_reduction_record(index_t dim, index_t j, time_point start) {
 		infos.at(dim).red_records.push_back(reduction_record(j, start));
-		std::cout << "  "
-		          << (j+1) << "/"
-		          << infos.at(dim).simplex_reduction_count << std::flush;
+		if(print_progress) {
+			std::cout << "  "
+			          << (j+1) << "/"
+			          << infos.at(dim).simplex_reduction_count << std::flush;
+		}
 	}
 
 	void complete_reduction_record(index_t dim, time_point end,
@@ -426,11 +430,13 @@ struct ripser {
 		rec.addition_count = add_count;
 		rec.addition_apparent_count = add_app_count;
 		rec.coboundary_element_count = coboundary_count;
-		index_t ms = (index_t) (get_duration(rec.start, end).count() * 1000.0);
-		std::cout << " :: tim=(" << ms << "ms)"
-		          << " :: add=(" << add_count << "/" << add_app_count << ")"
-		          << " :: ele=" << coboundary_count
-		          << std::endl;
+		if(print_progress) {
+			index_t ms = (index_t) (get_duration(rec.start, end).count() * 1000.0);
+			std::cout << " :: tim=(" << ms << "ms)"
+			          << " :: add=(" << add_count << "/" << add_app_count << ")"
+			          << " :: ele=" << coboundary_count
+			          << std::endl;
+		}
 	}
 };
 

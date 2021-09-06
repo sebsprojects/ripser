@@ -129,6 +129,7 @@ void compute_cohomology(ripser &ripser,
 	time_point reduction_start = get_time();
 	compressed_sparse_matrix reduction_matrix; // V
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+		ripser.add_reduction_record(dim, j, get_time());
 		reduction_matrix.append_column();
 		Cohom_Column working_reduction_column; // V_j
 		Cohom_Column working_coboundary;       // R_j
@@ -140,6 +141,8 @@ void compute_cohomology(ripser &ripser,
 		                                                             working_coboundary,
 		                                                             pivot_column_index);
 		// The reduction
+		index_t add_count = 0;
+		index_t app_count = 0;
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
@@ -152,6 +155,7 @@ void compute_cohomology(ripser &ripser,
 				               working_reduction_column,
 				               working_coboundary);
 				pivot = get_pivot(working_coboundary);
+				add_count++;
 			} else {
 				index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
 				if(get_index(e) != -1) {
@@ -162,6 +166,7 @@ void compute_cohomology(ripser &ripser,
 					                       working_reduction_column,
 					                       working_coboundary);
 					pivot = get_pivot(working_coboundary);
+					app_count++;
 				} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
@@ -174,12 +179,13 @@ void compute_cohomology(ripser &ripser,
 			reduction_matrix.push_back(e);
 			e = pop_pivot(working_reduction_column);
 		}
+		ripser.complete_reduction_record(dim, get_time(), add_count, app_count, -1);
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			// Non-essential pair. Get's ignored for output here
 		} else {
 			// Essential index (since clearing)
-			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF), std::vector<index_t>());
+			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF));
 		}
 	}
 	time_point reduction_end = get_time();
@@ -244,9 +250,9 @@ void compute_homology(ripser &ripser,
 			value_t birth = get_diameter(pivot);
 			value_t death = get_diameter(column_to_reduce);
 			if(death > birth * ripser.ratio) {
-				std::vector<index_t> rep;
+				std::vector<index_diameter_t> rep;
 				while(!working_boundary.empty()) {
-					rep.push_back(get_index(pop_pivot(working_boundary)));
+					rep.push_back(pop_pivot(working_boundary));
 				}
 				ripser.add_hom_class(dim - 1, pivot, column_to_reduce, rep);
 			}
@@ -326,7 +332,7 @@ int main(int argc, char** argv) {
 		std::cerr << "error: couldn't open file " << filename << std::endl;
 		exit(-1);
 	}
-	DistanceMatrix dist = read_lower_distance_matrix(file_stream);
+	DistanceMatrix dist = read_distance_matrix(file_stream);
 	value_t enclosing_radius = compute_enclosing_radius(dist);
 	index_t dim_max = 2;
 	index_t dim_threshold = 1;

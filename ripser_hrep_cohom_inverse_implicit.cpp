@@ -171,7 +171,8 @@ void add_partial_simplex_coboundary(ripser& ripser,
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
 		if(get_diameter(cofacet) <= ripser.threshold
-		   && !reverse_filtration_order(cofacet, min_simplex))
+		   //&& !reverse_filtration_order(cofacet, min_simplex)
+		   )
 		{
 			coboundary.push(cofacet);
 		}
@@ -187,26 +188,31 @@ void compute_reps(ripser& ripser,
 	              entry_hash_map& pcidm1,
 	              index_t dim) {
 	time_point rep_start = get_time();
-	std::vector<homology_class> hom_classes = ripser.barcodes.at(dim).hom_classes;
-	std::vector<homology_class> active_hom_classes;
+	std::vector<homology_class>& hom_classes = ripser.barcodes.at(dim).hom_classes;
+	std::vector<index_t> active_hom_classes;
 	index_t hom_class_index = 0;
 	index_diameter_t min_simplex;
 	index_t ctr_index = 0;
 	std::sort(hom_classes.begin(), hom_classes.end(), homology_class_order);
 	for(index_t j = 0; j < simplices.size(); j++) {
-		if(active_hom_classes.empty()) {
+		if(!active_hom_classes.empty()) {
 			Column Vt_row;
 			if(ctrd.at(ctr_index) == simplices.at(j)) { // Use V column
-				for(index_t l = Vd.column_end(ctr_index) - 1;
-				    l >= Vd.column_start(ctr_index);
-				    l--)
-				{
-					index_diameter_t v_ele = Vd.get_entry(l);
-					// TODO: We do not need all elements from Vd
-					// TODO: We know that Vd is sorted, maybe push can be faster
-					//if(reverse_filtration_order(min_simplex, v_ele) || min_simplex == v_ele) {
-					Vt_row.push(v_ele);
-					//}
+				// Add diagonal entry
+				Vt_row.push(simplices.at(j));
+				// Add remaining entries if they exist
+				if(Vd.column_start(ctr_index) != Vd.column_end(ctr_index)) {
+					for(index_t l = Vd.column_end(ctr_index) - 1;
+						l >= Vd.column_start(ctr_index);
+						l--)
+					{
+						index_diameter_t v_ele = Vd.get_entry(l);
+						// TODO: We do not need all elements from Vd
+						// TODO: We know that Vd is sorted, maybe push can be faster
+						//if(!reverse_filtration_order(v_ele, min_simplex)) {
+							Vt_row.push(v_ele);
+						//}
+					}
 				}
 			} else {
 				// V column missing, check if it was cleared, if not it is
@@ -227,23 +233,41 @@ void compute_reps(ripser& ripser,
 					}
 				}
 			}
-			for(auto hom_class : active_hom_classes) {
+			for(index_t active_index : active_hom_classes) {
 				// Compute the dot-product (representative * j_row)
-				for(index_t k = hom_class.representative.size() - 1; k >= 0; k--) {
+				homology_class& hom_class = hom_classes.at(active_index);
+				index_t parity = 0;
+				for(index_t k = ((index_t) hom_class.representative.size()) - 1; k >= 0; k--) {
+					Column Vt_row_copy = Vt_row;
 					index_diameter_t rep_ele = hom_class.representative.at(k);
+					index_diameter_t v_ele = pop_pivot(Vt_row_copy);
+					while(get_index(v_ele) != -1) {
+						//if(!reverse_filtration_order(rep_ele, v_ele)) {
+							if(rep_ele == v_ele) {
+								parity++;
+						//	}
+						//	break;
+						}
+						v_ele = pop_pivot(Vt_row_copy);
+					}
+				}
+				if(parity % 2 == 1) {
+					hom_class.representative.push_back(simplices.at(j));
 				}
 			}
 		}
-		if(ctrd.at(ctr_index) == simplices.at(j)) {
+		if(ctr_index < ((index_t) ctrd.size()) - 1 && ctrd.at(ctr_index) == simplices.at(j)) {
 			ctr_index++;
 		}
 		if(simplices.at(j) == hom_classes.at(hom_class_index).birth) {
-			//if(active_hom_classes.empty()) {
-			//	min_simplex = simplices.at(j);
-			//}
-			active_hom_classes.push_back(hom_classes.at(hom_class_index));
-			active_hom_classes.at(hom_class_index).representative.push_back(simplices.at(j));
-			hom_class_index++;
+			if(active_hom_classes.empty()) {
+				min_simplex = simplices.at(j);
+			}
+			active_hom_classes.push_back(hom_class_index);
+			hom_classes.at(hom_class_index).representative.push_back(simplices.at(j));
+			if(hom_class_index < ((index_t) hom_classes.size()) - 1) {
+			  hom_class_index++;
+			}
 		}
 	}
 	ripser.infos.at(dim).representative_dur += get_duration(rep_start, get_time());
@@ -251,15 +275,17 @@ void compute_reps(ripser& ripser,
 
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
+	std::vector<index_diameter_t> ctrdm1;
 	entry_hash_map pivot_column_index;
+	entry_hash_map pcidm1;
+	compressed_sparse_matrix Vdm1;
+	compressed_sparse_matrix Vd;
 	for(index_t i = 0; i < ripser.n; i++) {
 		value_t diam = ripser.compute_diameter(i, 0);
 		simplices.push_back(index_diameter_t(i, diam));
 	}
 	ripser.infos.at(0).simplex_total_count = simplices.size();
 	ripser.infos.at(0).simplex_reduction_count = simplices.size();
-	compressed_sparse_matrix Vdm1;
-	compressed_sparse_matrix Vd;
 	index_t last_dim = std::min(ripser.dim_threshold, ripser.dim_max);
 	for(index_t dim = 0; dim <= last_dim; ++dim) {
 		std::vector<index_diameter_t> columns_to_reduce;
@@ -273,6 +299,7 @@ void compute_barcodes(ripser& ripser) {
 			                           pivot_column_index,
 			                           dim);
 		}
+		pcidm1 = std::move(pivot_column_index);
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
 		compute_pairs(ripser,
@@ -282,12 +309,20 @@ void compute_barcodes(ripser& ripser) {
 		              dim);
 		compute_reps(ripser,
 		             simplices,
+		             ctrdm1,
 		             columns_to_reduce,
 		             Vdm1,
 		             Vd,
+		             pcidm1,
 		             dim);
-		Vdm1 = Vd;
-		Vd = compressed_sparse_matrix();
+		// Move the data structures
+		Vdm1.bounds = std::move(Vd.bounds);
+		Vdm1.entries = std::move(Vdm1.entries);
+		ctrdm1 = std::move(columns_to_reduce);
+		// Clear the expired data structures
+		Vd.bounds.clear();
+		Vd.entries.clear();
+		columns_to_reduce.clear();
 	}
 }
 

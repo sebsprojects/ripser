@@ -170,10 +170,10 @@ void compute_pairs(ripser &ripser,
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			// Non-essential index
-			ripser.add_hom_class(dim, column_to_reduce, pivot, std::vector<index_t>());
+			ripser.add_hom_class(dim, column_to_reduce, pivot);
 		} else {
 			// Essential index (since clearing)
-			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF), std::vector<index_t>());
+			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF));
 		}
 	}
 	info.reduction_dur = get_duration(reduction_start, get_time());
@@ -205,7 +205,7 @@ void compute_reps(ripser& ripser,
 		auto it = std::lower_bound(simplices.begin(), simplices.end(), birth,
 		                           reverse_filtration_order);
 		index_t column_index = std::distance(simplices.begin(), it);
-		std::vector<index_diameter_t> rep;
+		std::vector<index_diameter_t>& rep = ripser.barcodes.at(dim).hom_classes.at(i).representative;
 		rep.push_back(birth); // j = column_index
 		//std::cout << column_index << ": ";
 		for(index_t j = column_index + 1; j < (index_t) simplices.size(); j++) {
@@ -266,9 +266,6 @@ void compute_reps(ripser& ripser,
 					rep.push_back(simplices.at(j));
 				}
 			}
-		}
-		for(auto el : rep) {
-			ripser.barcodes.at(dim).hom_classes.at(i).representative.push_back(get_index(el));
 		}
 	}
 	ripser.infos.at(dim).representative_dur += get_duration(rep_start, get_time());
