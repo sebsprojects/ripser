@@ -25,10 +25,10 @@ ripser_hrep_cohom_inverse_implicit: ripser_hrep_cohom_inverse_implicit.cpp
 	c++ -std=c++11 -Wall ripser_hrep_cohom_inverse_implicit.cpp -o ripser_hrep_cohom_inverse_implicit -g
 
 ripser_hrep_cohomhom_o3:
-	c++ -std=c++11 -Wall ripser_hrep_cohom_hom.cpp -o ripser_hrep_cohomhom -O3
+	c++ -std=c++11 -Wall ripser_hrep_cohom_hom.cpp -o ripser_hrep_cohomhom_o3 -O3
 
 ripser_hrep_cohominv_o3:
-	c++ -std=c++11 -Wall ripser_hrep_cohom_inverse_implicit.cpp -o ripser_hrep_cohominv -O3
+	c++ -std=c++11 -Wall ripser_hrep_cohom_inverse_implicit.cpp -o ripser_hrep_cohominv_o3 -O3
 
 clean:
-	rm -f ripser_hrep_hom_ref ripser_hrep_hom ripser_hrep_hom_clearing ripser_hrep_cohom_hom ripser_hrep_cohom_inverse ripser_hrep_cohom_inverse_clearing ripser_hrep_cohom_inverse_forwardsubs ripser_hrep_cohom_inverse_implicit
+	rm -f ripser_hrep_hom_ref ripser_hrep_hom ripser_hrep_hom_clearing ripser_hrep_cohom_hom ripser_hrep_cohom_inverse ripser_hrep_cohom_inverse_clearing ripser_hrep_cohom_inverse_forwardsubs ripser_hrep_cohom_inverse_implicit ripser_hrep_cohominv_o3 ripser_hrep_cohomhom_o3

@@ -251,8 +251,10 @@ void compute_homology(ripser &ripser,
 			value_t death = get_diameter(column_to_reduce);
 			if(death > birth * ripser.ratio) {
 				std::vector<index_diameter_t> rep;
-				while(!working_boundary.empty()) {
-					rep.push_back(pop_pivot(working_boundary));
+				e = pop_pivot(working_boundary);
+				while(get_index(e) != -1) {
+					rep.push_back(e);
+					e = pop_pivot(working_boundary);
 				}
 				ripser.add_hom_class(dim - 1, pivot, column_to_reduce, rep);
 			}

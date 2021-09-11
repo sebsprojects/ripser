@@ -193,14 +193,17 @@ struct compressed_sparse_matrix {
 	}
 };
 
+compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_stream) {
+	std::vector<value_t> distances;
+	value_t value;
+	while (input_stream >> value) {
+		distances.push_back(value);
+		input_stream.ignore();
+	}
+	return compressed_lower_distance_matrix(std::move(distances));
+}
+
 compressed_lower_distance_matrix read_distance_matrix(std::istream& input_stream) {
-	//std::vector<value_t> distances;
-	//value_t value;
-	//while (input_stream >> value) {
-	//	distances.push_back(value);
-	//	input_stream.ignore();
-	//}
-	//return compressed_lower_distance_matrix(std::move(distances));
 	std::vector<value_t> distances;
 	std::string line;
 	value_t value;
@@ -344,7 +347,7 @@ struct ripser {
 	mutable std::vector<info> infos;
 	bool print_progress;
 
-	ripser(DistanceMatrix&& _dist, index_t _dim_max, index_t _dim_threshold, value_t _threshold, float _ratio)
+	ripser(DistanceMatrix&& _dist, index_t _dim_max, index_t _dim_threshold, value_t _threshold, float _ratio, bool _print_progress=false)
 		: dist(std::move(_dist)),
 		  n(dist.size()),
 		  dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
@@ -353,7 +356,7 @@ struct ripser {
 		  ratio(_ratio),
 		  binomial_coeff(n, dim_max + 2),
 		  barcodes(std::vector<barcode>()),
-		  print_progress(true)
+		  print_progress(_print_progress)
 	{
 		for(index_t i = 0; i <= dim_threshold; ++i) {
 			barcodes.push_back(barcode(i));
@@ -779,8 +782,8 @@ index_diameter_t get_zero_apparent_cofacet(ripser& ripser, index_diameter_t simp
 bool is_in_zero_apparent_pair(ripser& ripser, index_diameter_t simplex, index_t dim) {
 	if(dim == 0) {
 		return get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1;
-	} else if(dim == ripser.dim_max) {
-		return (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1);
+	//} else if(dim == ripser.dim_max) {
+	//	return (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1);
 	} else {
 		return (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1) ||
 		       (get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1);

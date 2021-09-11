@@ -187,7 +187,7 @@ void print_barcode(ripser& ripser, barcode& barcode) {
 	std::cout << "persistence intervals in dim " << barcode.dim << ":" << std::endl;
 	std::sort(barcode.hom_classes.begin(),
 	          barcode.hom_classes.end(),
-	          homology_class_order);
+	          homology_class_print_order);
 	for(auto hc : barcode.hom_classes) {
 		value_t birth = std::max(0.0f, get_diameter(hc.birth));
 		value_t death = get_diameter(hc.death);
