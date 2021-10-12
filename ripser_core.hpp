@@ -193,6 +193,11 @@ struct compressed_sparse_matrix {
 	}
 };
 
+
+/* **************************************************************************
+ * Matrix Read-In
+ * *************************************************************************/
+
 compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_stream) {
 	std::vector<value_t> distances;
 	value_t value;
@@ -203,11 +208,11 @@ compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_
 	return compressed_lower_distance_matrix(std::move(distances));
 }
 
-compressed_lower_distance_matrix read_distance_matrix(std::istream& input_stream) {
+compressed_lower_distance_matrix read_full_distance_matrix(std::istream& input_stream) {
 	std::vector<value_t> distances;
 	std::string line;
 	value_t value;
-	for (int i = 0; std::getline(input_stream, line); ++i) {
+	for(int i = 0; std::getline(input_stream, line); ++i) {
 		std::istringstream s(line);
 		for (int j = 0; j < i && s >> value; ++j) {
 			distances.push_back(value);
@@ -217,6 +222,44 @@ compressed_lower_distance_matrix read_distance_matrix(std::istream& input_stream
 	return compressed_lower_distance_matrix(std::move(distances));
 }
 
+compressed_lower_distance_matrix read_distance_matrix(std::string filepath, std::string input_type) {
+	std::ifstream file_stream(filepath);
+	if(!file_stream) {
+		std::cerr << "error: couldn't open matrix file: " << filepath << std::endl;
+		exit(-1);
+	}
+	if(input_type == "lower_distance_matrix") {
+		return read_lower_distance_matrix(file_stream);
+	} else if(input_type == "full_distance_matrix") {
+		return read_full_distance_matrix(file_stream);
+	} else {
+		std::cerr << "error: invalid matrix type: " << input_type << std::endl;
+		exit(-1);
+	}
+}
+
+value_t compute_enclosing_radius(const DistanceMatrix& dist) {
+	value_t min = INF;
+	value_t max = -INF;
+	value_t max_finite = max;
+	value_t enclosing_radius = INF;
+
+	for(size_t i = 0; i < dist.size(); ++i) {
+		value_t r_i = -INF;
+		for (size_t j = 0; j < dist.size(); ++j) {
+			r_i = std::max(r_i, dist(i, j));
+		}
+		enclosing_radius = std::min(enclosing_radius, r_i);
+	}
+	for(auto d : dist.distances) {
+		min = std::min(min, d);
+		max = std::max(max, d);
+		if(d != INF) {
+			max_finite = std::max(max_finite, d);
+		}
+	}
+	return enclosing_radius;
+}
 
 /* **************************************************************************
  * Types for Reduction Algorithm
@@ -332,35 +375,59 @@ duration get_duration(time_point start, time_point end) {
 	return end - start;
 }
 
+struct ripser_config {
+	std::string file_path;
+	std::string output_path;
+	std::string input_type;
+	index_t dim_max;
+	index_t dim_threshold;
+	value_t ratio;
+	value_t threshold;
+	bool print_progress;
+	std::vector<std::pair<index_t, index_t>> relative_subcomplex;
+
+	ripser_config()
+		: file_path(""),
+		  output_path(""),
+		  input_type("lower_distance_matrix"),
+		  dim_max(2),
+		  dim_threshold(1),
+		  ratio(1.0),
+		  threshold(-1.0),
+		  print_progress(false),
+		  relative_subcomplex()
+  { }
+};
+
 struct ripser {
 
 	const DistanceMatrix dist;
 	const index_t n;
-	const index_t dim_max;
-	const index_t dim_threshold;
-	const value_t threshold;
-	const float ratio;
 	const binomial_coeff_table binomial_coeff;
 	
-	// Output
+	mutable ripser_config config;
 	mutable std::vector<barcode> barcodes;
 	mutable std::vector<info> infos;
-	bool print_progress;
 
-	ripser(DistanceMatrix&& _dist, index_t _dim_max, index_t _dim_threshold, value_t _threshold, float _ratio, bool _print_progress=false)
-		: dist(std::move(_dist)),
+	ripser(ripser_config _config)
+		: dist(read_distance_matrix(_config.file_path, _config.input_type)),
 		  n(dist.size()),
-		  dim_max(std::min(_dim_max, index_t(dist.size() - 2))),
-		  dim_threshold(_dim_threshold),
-		  threshold(_threshold),
-		  ratio(_ratio),
-		  binomial_coeff(n, dim_max + 2),
-		  barcodes(std::vector<barcode>()),
-		  print_progress(_print_progress)
+		  binomial_coeff(n, _config.dim_max + 2),
+		  config(_config),
+		  barcodes(),
+		  infos()
 	{
-		for(index_t i = 0; i <= dim_threshold; ++i) {
+		if(config.threshold < 0.0) {
+			config.threshold = compute_enclosing_radius(dist);
+		}
+		for(index_t i = 0; i <= config.dim_threshold; ++i) {
 			barcodes.push_back(barcode(i));
 			infos.push_back(info(i));
+		}
+		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
+			if(config.relative_subcomplex.at(i).second == -1) {
+				config.relative_subcomplex.at(i).second = n - 1;
+			}
 		}
 	}
 	
@@ -417,7 +484,7 @@ struct ripser {
 
 	void add_reduction_record(index_t dim, index_t j, time_point start) {
 		infos.at(dim).red_records.push_back(reduction_record(j, start));
-		if(print_progress) {
+		if(config.print_progress) {
 			std::cout << "  "
 			          << (j+1) << "/"
 			          << infos.at(dim).simplex_reduction_count << std::flush;
@@ -433,7 +500,7 @@ struct ripser {
 		rec.addition_count = add_count;
 		rec.addition_apparent_count = add_app_count;
 		rec.coboundary_element_count = coboundary_count;
-		if(print_progress) {
+		if(config.print_progress) {
 			index_t ms = (index_t) (get_duration(rec.start, end).count() * 1000.0);
 			std::cout << " :: tim=(" << ms << "ms)"
 			          << " :: add=(" << add_count << "/" << add_app_count << ")"
@@ -443,6 +510,15 @@ struct ripser {
 	}
 };
 
+bool is_in_relative_subcomplex(ripser& ripser, index_t idx) {
+	for(index_t i = 0; i < (index_t) ripser.config.relative_subcomplex.size(); i++) {
+		auto pair = ripser.config.relative_subcomplex.at(i);
+		if(idx >= pair.first && idx <= pair.second) {
+			return true;
+		}
+	}
+	return false;
+}
 
 /* **************************************************************************
  * Boundary and Coboundary Enumerators
@@ -601,7 +677,7 @@ void add_simplex_coboundary(ripser& ripser,
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
 		// Threshold check
-		if(get_diameter(cofacet) <= ripser.threshold) {
+		if(get_diameter(cofacet) <= ripser.config.threshold) {
 			working_coboundary.push(cofacet);
 		}
 	}
@@ -646,7 +722,7 @@ void add_simplex_boundary(ripser &ripser,
 	facets.set_simplex(simplex, dim);
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
-		if(get_diameter(facet) <= ripser.threshold) {
+		if(get_diameter(facet) <= ripser.config.threshold) {
 			working_boundary.push(facet);
 		}
 	}
@@ -727,7 +803,7 @@ std::vector<index_diameter_t> get_edges(ripser& ripser) {
 		ripser.get_simplex_vertices(index, 1, ripser.dist.size(), vertices);
 		value_t length = ripser.dist(vertices[0], vertices[1]);
 		// Threshold check
-		if(length <= ripser.threshold) {
+		if(length <= ripser.config.threshold) {
 			edges.push_back(std::make_pair(index, length));
 		}
 	}
@@ -792,35 +868,85 @@ bool is_in_zero_apparent_pair(ripser& ripser, index_diameter_t simplex, index_t 
 
 
 /* **************************************************************************
- * Other
+ * Config Parsing
  * *************************************************************************/
 
-value_t compute_enclosing_radius(DistanceMatrix& dist) {
-	// Compute enclosing radius and distance bounds
-	value_t min = INF;
-	value_t max = -INF;
-	value_t max_finite = max;
-	value_t enclosing_radius = INF;
+std::pair<index_t, index_t> parse_interval(std::string tok) {
+	size_t dash_pos = tok.find("-");
+	if(dash_pos == std::string::npos) {
+		return std::make_pair(std::stoi(tok), std::stoi(tok));
+	} else {
+		index_t start = 0;
+		index_t end = -1;
+		std::string string_start = tok.substr(0, dash_pos);
+		if(!string_start.empty()) {
+			start = std::stoi(string_start);
+		}
+		if(dash_pos + 1 < tok.length()) {
+			std::string string_end = tok.substr(dash_pos + 1, tok.length());
+			if(!string_end.empty()) {
+				end = std::stoi(string_end);
+			}
+		}
+		return std::make_pair(start,end);
+	}
+}
 
-	for(size_t i = 0; i < dist.size(); ++i) {
-		value_t r_i = -INF;
-		for (size_t j = 0; j < dist.size(); ++j) {
-			r_i = std::max(r_i, dist(i, j));
-		}
-		enclosing_radius = std::min(enclosing_radius, r_i);
+ripser_config read_config(char* configpath) {
+	std::ifstream file_stream(configpath);
+	if(file_stream.fail()) {
+		std::cerr << "error: couldn't open config file " << configpath << std::endl;
+		exit(-1);
 	}
-	for(auto d : dist.distances) {
-		min = std::min(min, d);
-		max = std::max(max, d);
-		if(d != INF) {
-			max_finite = std::max(max_finite, d);
+	ripser_config config;
+	std::string line;
+	while(getline(file_stream, line)) {
+		line.erase(std::remove_if(line.begin(), line.end(), isspace), line.end());
+		if(line.empty() || line[0] == '#' || line[0] == ';') {
+		  continue;
+		}
+		size_t delim_pos = line.find("=");
+		std::string name = line.substr(0, delim_pos);
+		std::string string_value = line.substr(delim_pos + 1);
+		if(name == "file_path") {
+			config.file_path = string_value;
+		}
+		if(name == "output_path") {
+			config.output_path = string_value;
+		}
+		if(name == "input_type") {
+			config.input_type = string_value;
+		}
+		if(name == "dim_max") {
+			config.dim_max = std::stoi(string_value);
+		}
+		if(name == "dim_threshold") {
+			config.dim_threshold = std::stoi(string_value);
+		}
+		if(name == "ratio") {
+			config.ratio = std::stod(string_value);
+		}
+		if(name == "threshold") {
+			config.threshold = std::stod(string_value);
+		}
+		if(name == "print_progress") {
+			config.print_progress = (string_value == "true") || (string_value == "1");
+		}
+		if(name == "relative_subcomplex") {
+			if(string_value.empty()) {
+				continue;
+			}
+			size_t comma_pos = 0;
+			std::string tok;
+			while((comma_pos = string_value.find(",")) != std::string::npos) {
+				tok = string_value.substr(0, comma_pos);
+				config.relative_subcomplex.push_back(parse_interval(tok));
+				string_value.erase(0, comma_pos + 1);
+			}
+			config.relative_subcomplex.push_back(parse_interval(string_value));
 		}
 	}
-	//std::cout << "info: value range: [" << min << "," << max_finite << "]" << std::endl;
-	//std::cout << "info: distance matrix with " << dist.size()
-	//		  << " points, using threshold at enclosing radius " << enclosing_radius
-	//		  << std::endl;
-	return enclosing_radius;
+	return config;
 }
 
 #endif

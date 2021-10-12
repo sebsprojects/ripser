@@ -258,6 +258,29 @@ void print_info(ripser& ripser, info& info) {
 	}
 }
 
+void print_config(ripser_config& config) {
+	std::cout << std::endl << "running ripser with config" << std::endl;
+	std::cout << "  dataset at file path :: " << config.file_path << std::endl;
+	std::cout << "  output at file path :: " << config.output_path << std::endl;
+	std::cout << "  dataset input type :: " << config.input_type << std::endl;
+	std::cout << "  dim max :: " << config.dim_max << std::endl;
+	std::cout << "  dim threshold :: " << config.dim_threshold << std::endl;
+	std::cout << "  ratio :: " << config.ratio << std::endl;
+	std::cout << "  diam threshold :: " << config.threshold << std::endl;
+	std::cout << "  relative :: ";
+	if(config.relative_subcomplex.size() == 0) {
+		std::cout << "(empty)" << std::endl;
+	} else {
+		auto pair = config.relative_subcomplex.at(0);
+		std::cout << pair.first << "-" << pair.second;
+		for(index_t i = 1; i < (index_t) config.relative_subcomplex.size(); i++) {
+			pair = config.relative_subcomplex.at(i);
+			std::cout << "," << pair.first << "-" << pair.second;
+		}
+	}
+	std::cout << std::endl << std::endl;
+}
+
 void print_infos(ripser& ripser) {
 	for(auto i : ripser.infos) {
 		print_info(ripser, i);
