@@ -222,7 +222,48 @@ compressed_lower_distance_matrix read_full_distance_matrix(std::istream& input_s
 	return compressed_lower_distance_matrix(std::move(distances));
 }
 
-compressed_lower_distance_matrix read_distance_matrix(std::string filepath, std::string input_type) {
+std::vector<std::vector<value_t>> read_point_cloud(std::istream& input_stream) {
+	std::vector<std::vector<value_t>> points;
+	std::string line;
+	value_t value;
+	while (std::getline(input_stream, line)) {
+		std::vector<value_t> point;
+		std::istringstream s(line);
+		while (s >> value) {
+			point.push_back(value);
+			s.ignore();
+		}
+		if(!point.empty()) {
+			points.push_back(point);
+		}
+		assert(point.size() == points.front().size());
+	}
+	return points;
+}
+
+struct diff_squared {
+	value_t operator()(value_t u, value_t v) {
+		return (u - v) * (u - v);
+	}
+};
+
+std::vector<value_t> point_cloud_to_distance_vector(std::vector<std::vector<value_t>>& points) {
+	std::vector<value_t> distances;
+	for(size_t i = 0; i < points.size(); i++) {
+		for(size_t j = 0; j < i; j++) {
+			value_t d = std::sqrt(std::inner_product(points.at(i).begin(),
+			                                         points.at(i).end(),
+			                                         points.at(j).begin(),
+			                                         0.0,
+			                                         std::plus<value_t>(),
+			                                         diff_squared()));
+			distances.push_back(d);
+		}
+	}
+	return distances;
+}
+
+compressed_lower_distance_matrix read_input(std::string filepath, std::string input_type) {
 	std::ifstream file_stream(filepath);
 	if(!file_stream) {
 		std::cerr << "error: couldn't open matrix file: " << filepath << std::endl;
@@ -232,6 +273,10 @@ compressed_lower_distance_matrix read_distance_matrix(std::string filepath, std:
 		return read_lower_distance_matrix(file_stream);
 	} else if(input_type == "full_distance_matrix") {
 		return read_full_distance_matrix(file_stream);
+	} else if(input_type == "point_cloud") {
+		std::vector<std::vector<value_t>> points = read_point_cloud(file_stream);
+		std::vector<value_t> distances = point_cloud_to_distance_vector(points);
+		return compressed_lower_distance_matrix(std::move(distances));
 	} else {
 		std::cerr << "error: invalid matrix type: " << input_type << std::endl;
 		exit(-1);
@@ -410,7 +455,7 @@ struct ripser {
 	mutable std::vector<info> infos;
 
 	ripser(ripser_config _config)
-		: dist(read_distance_matrix(_config.file_path, _config.input_type)),
+		: dist(read_input(_config.file_path, _config.input_type)),
 		  n(dist.size()),
 		  binomial_coeff(n, _config.dim_max + 2),
 		  config(_config),
@@ -902,7 +947,7 @@ ripser_config read_config(char* configpath) {
 	std::string line;
 	while(getline(file_stream, line)) {
 		line.erase(std::remove_if(line.begin(), line.end(), isspace), line.end());
-		if(line.empty() || line[0] == '#' || line[0] == ';') {
+		if(line.empty() || line[0] == '#' || line[0] == ';' || line[0] == '[') {
 		  continue;
 		}
 		size_t delim_pos = line.find("=");

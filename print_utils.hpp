@@ -205,11 +205,14 @@ void print_barcode(ripser& ripser, barcode& barcode) {
 	}
 }
 
-void write_dim1_cycles(ripser& ripser, std::string filename) {
+void write_dim1_cycles(ripser& ripser) {
 	barcode& barcode = ripser.barcodes.at(1);
 	std::sort(barcode.hom_classes.begin(),
 	          barcode.hom_classes.end(),
 	          homology_class_order);
+	std::string ip = ripser.config.file_path;
+	std::string dataset_name = ip.substr(ip.find_last_of("/\\") + 1);
+	std::string filename = ripser.config.output_path + "/" + dataset_name + "_reps.txt";
 	std::ofstream ofs(filename, std::ofstream::trunc);
 	for(auto hc : barcode.hom_classes) {
 		ofs << "# " << std::max(0.0f, get_diameter(hc.birth)) << " "

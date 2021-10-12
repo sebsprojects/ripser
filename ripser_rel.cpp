@@ -323,5 +323,6 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	print_barcodes(ripser);
 	print_infos(ripser);
+	write_dim1_cycles(ripser);
 	exit(0);
 }
