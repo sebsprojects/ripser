@@ -12,6 +12,53 @@ typedef std::priority_queue<index_diameter_t,
                             std::vector<index_diameter_t>,
                             filtration_order_comp> Hom_Column;
 
+template <typename Column>
+void add_relative_simplex_boundary(ripser &ripser,
+                                   const index_diameter_t simplex,
+                                   const index_t dim,
+                                   Column& working_reduction_column,
+                                   Column& working_boundary) {
+	simplex_boundary_enumerator facets(ripser);
+	working_reduction_column.push(simplex);
+	facets.set_simplex(simplex, dim);
+	while(facets.has_next()) {
+		index_diameter_t facet = facets.next();
+		if(get_diameter(facet) <= ripser.config.threshold &&
+		   !ripser.is_relative_simplex(get_index(facet), dim - 1)) {
+			working_boundary.push(facet);
+		}
+	}
+}
+
+template <typename Column>
+void add_relative_boundary(ripser& ripser,
+                           compressed_sparse_matrix& reduction_matrix,
+                           const std::vector<index_diameter_t>& columns_to_reduce,
+                           const size_t index_column_to_add,
+                           const size_t dim,
+                           Column& working_reduction_column,
+                           Column& working_boundary) {
+	//TODO(seb): Do we need the correct diameter here?
+	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add));
+	// Computation of R_j due to implicit reduction
+	add_relative_simplex_boundary(ripser,
+	                              column_to_add,
+	                              dim,
+	                              working_reduction_column,
+	                              working_boundary);
+	for(index_t i = reduction_matrix.column_start(index_column_to_add);
+	    i < reduction_matrix.column_end(index_column_to_add);
+	    ++i) {
+		index_diameter_t simplex = reduction_matrix.get_entry(i);
+		add_relative_simplex_boundary(ripser,
+		                              simplex,
+		                              dim,
+		                              working_reduction_column,
+		                              working_boundary);
+	}
+}
+
+
 index_diameter_t cohom_init_coboundary_and_get_pivot(ripser &ripser,
                                                      const index_diameter_t simplex,
                                                      const index_t dim,
@@ -62,7 +109,8 @@ index_diameter_t hom_init_boundary_and_get_pivot(ripser &ripser,
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
 		// Threshold check
-		if(get_diameter(facet) <= ripser.config.threshold) {
+		if(get_diameter(facet) <= ripser.config.threshold &&
+		   !ripser.is_relative_simplex(get_index(facet), dim - 1)) {
 			working_boundary.push(facet);
 		}
 	}
@@ -204,23 +252,23 @@ void compute_homology(ripser &ripser,
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
 				size_t index_column_to_add = pair->second;
-				add_boundary(ripser,
-				             reduction_matrix,
-				             columns_to_reduce,
-				             index_column_to_add,
-				             dim,
-				             working_reduction_column,
-				             working_boundary);
+				add_relative_boundary(ripser,
+				                      reduction_matrix,
+				                      columns_to_reduce,
+				                      index_column_to_add,
+				                      dim,
+				                      working_reduction_column,
+				                      working_boundary);
 				pivot = get_pivot(working_boundary);
 			} else {
 				index_diameter_t e = get_zero_apparent_cofacet(ripser, pivot, dim - 1);
 				if(get_index(e) != -1) {
 					// TODO: Why is the necessary w.r.t. apparent pairs?
-					add_simplex_boundary(ripser,
-					                     e,
-					                     dim,
-					                     working_reduction_column,
-					                     working_boundary);
+					add_relative_simplex_boundary(ripser,
+					                              e,
+					                              dim,
+					                              working_reduction_column,
+					                              working_boundary);
 					pivot = get_pivot(working_boundary);
 				} else {
 					pivot_column_index.insert({get_index(pivot), j});
@@ -261,7 +309,7 @@ void compute_barcodes(ripser& ripser) {
 	// Init 0-simplices
 	std::vector<index_diameter_t> simplices;
 	for(index_t i = 0; i < ripser.n; i++) {
-		if(!is_in_relative_subcomplex(ripser, i)) {
+		if(!ripser.is_relative_vertex(i)) {
 			value_t diam = ripser.compute_diameter(i, 0);
 			simplices.push_back(index_diameter_t(i, diam));
 		}

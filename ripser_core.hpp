@@ -510,6 +510,28 @@ struct ripser {
 		}
 	}
 
+	bool is_relative_vertex(index_t idx) const {
+		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
+			auto pair = config.relative_subcomplex.at(i);
+			if(idx >= pair.first && idx <= pair.second) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	bool is_relative_simplex(index_t idx, const index_t dim) const {
+		index_t n = this->n - 1;
+		for(index_t k = dim + 1; k > 0; --k) {
+			n = get_max_vertex(idx, k, n);
+			if(!is_relative_vertex(n)) {
+				return false;
+			}
+			idx -= binomial_coeff(n, k);
+		}
+		return true;
+	}
+
 	// Compute the diameter for a k-simplex idx
 	// TODO(seb): dim vs k issue
 	value_t compute_diameter(const index_t idx, const index_t dim) const {
@@ -555,15 +577,6 @@ struct ripser {
 	}
 };
 
-bool is_in_relative_subcomplex(ripser& ripser, index_t idx) {
-	for(index_t i = 0; i < (index_t) ripser.config.relative_subcomplex.size(); i++) {
-		auto pair = ripser.config.relative_subcomplex.at(i);
-		if(idx >= pair.first && idx <= pair.second) {
-			return true;
-		}
-	}
-	return false;
-}
 
 /* **************************************************************************
  * Boundary and Coboundary Enumerators

@@ -133,7 +133,7 @@ data_all, data_abs, data_rel = read_samples(input_path)
 reps = read_reps(input_path, output_path)
 
 plot_samples(data_abs, data_rel)
-plot_reps(reps, data_all, [3])
+plot_reps(reps, data_all, [0])
 plt.show()
 #verify_reps(reps)
 #plot_samples(data_abs, data_rel)
