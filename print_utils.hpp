@@ -235,11 +235,12 @@ void print_barcodes(ripser& ripser) {
 }
 
 void print_info(ripser& ripser, info& info) {
-	std::cout << "info in dim " << info.dim << ":" << std::endl;
+	std::cout << std::endl << std::endl
+	          << "info in dim " << info.dim << ":" << std::endl;
 	std::cout << "  total simplex count:     "
 	          << info.simplex_total_count << std::endl;
 	std::cout << "  reduction simplex count: "
-	          << info.simplex_reduction_count << std::endl << std::endl;
+	          << info.simplex_reduction_count << std::endl;
 
 	std::cout << "  clearing count:          "
 	          << info.clearing_count << std::endl;
@@ -261,15 +262,22 @@ void print_info(ripser& ripser, info& info) {
 	}
 }
 
-void print_config(ripser_config& config) {
+void print_config(ripser& ripser) {
+	ripser_config& config = ripser.config;
 	std::cout << std::endl << "running ripser with config" << std::endl;
 	std::cout << "  dataset at file path :: " << config.file_path << std::endl;
 	std::cout << "  output at file path :: " << config.output_path << std::endl;
 	std::cout << "  dataset input type :: " << config.input_type << std::endl;
 	std::cout << "  dim max :: " << config.dim_max << std::endl;
-	std::cout << "  dim threshold :: " << config.dim_threshold << std::endl;
 	std::cout << "  ratio :: " << config.ratio << std::endl;
-	std::cout << "  diam threshold :: " << config.threshold << std::endl;
+	std::cout << "  threshold :: " << ripser.threshold;
+	if(config.use_enclosing_threshold) {
+		std::cout << " (enclosing threshold)" << std::endl;
+	} else if(config.config_threshold < 0) {
+		std::cout << " (maximum distance)" << std::endl;
+	} else {
+		std::cout << std::endl;
+	}
 	std::cout << "  relative :: ";
 	if(config.relative_subcomplex.size() == 0) {
 		std::cout << "(empty)" << std::endl;

@@ -10,6 +10,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <chrono>
+#include <iomanip>
 
 
 /* **************************************************************************
@@ -284,11 +285,7 @@ compressed_lower_distance_matrix read_input(std::string filepath, std::string in
 }
 
 value_t compute_enclosing_radius(const DistanceMatrix& dist) {
-	value_t min = INF;
-	value_t max = -INF;
-	value_t max_finite = max;
 	value_t enclosing_radius = INF;
-
 	for(size_t i = 0; i < dist.size(); ++i) {
 		value_t r_i = -INF;
 		for (size_t j = 0; j < dist.size(); ++j) {
@@ -296,14 +293,15 @@ value_t compute_enclosing_radius(const DistanceMatrix& dist) {
 		}
 		enclosing_radius = std::min(enclosing_radius, r_i);
 	}
-	for(auto d : dist.distances) {
-		min = std::min(min, d);
-		max = std::max(max, d);
-		if(d != INF) {
-			max_finite = std::max(max_finite, d);
-		}
-	}
 	return enclosing_radius;
+}
+
+value_t compute_max_distance(const DistanceMatrix& dist) {
+	value_t max = -INF;
+	for(auto d : dist.distances) {
+		max = std::max(max, d);
+	}
+	return max;
 }
 
 /* **************************************************************************
@@ -425,9 +423,9 @@ struct ripser_config {
 	std::string output_path;
 	std::string input_type;
 	index_t dim_max;
-	index_t dim_threshold;
 	value_t ratio;
-	value_t threshold;
+	value_t config_threshold;
+	bool use_enclosing_threshold;
 	bool print_progress;
 	std::vector<std::pair<index_t, index_t>> relative_subcomplex;
 
@@ -436,9 +434,9 @@ struct ripser_config {
 		  output_path(""),
 		  input_type("lower_distance_matrix"),
 		  dim_max(2),
-		  dim_threshold(1),
 		  ratio(1.0),
-		  threshold(-1.0),
+		  config_threshold(-1.0),
+		  use_enclosing_threshold(false),
 		  print_progress(false),
 		  relative_subcomplex()
   { }
@@ -449,8 +447,9 @@ struct ripser {
 	const DistanceMatrix dist;
 	const index_t n;
 	const binomial_coeff_table binomial_coeff;
-	
+
 	mutable ripser_config config;
+	mutable value_t threshold;
 	mutable std::vector<barcode> barcodes;
 	mutable std::vector<info> infos;
 
@@ -459,13 +458,19 @@ struct ripser {
 		  n(dist.size()),
 		  binomial_coeff(n, _config.dim_max + 2),
 		  config(_config),
+		  threshold(-1),
 		  barcodes(),
 		  infos()
 	{
-		if(config.threshold < 0.0) {
-			config.threshold = compute_enclosing_radius(dist);
+		if(config.use_enclosing_threshold) {
+			threshold = compute_enclosing_radius(dist);
 		}
-		for(index_t i = 0; i <= config.dim_threshold; ++i) {
+		if(config.config_threshold < 0.0) {
+			threshold = compute_max_distance(dist);
+		} else {
+			threshold = config.config_threshold;
+		}
+		for(index_t i = 0; i <= config.dim_max; ++i) {
 			barcodes.push_back(barcode(i));
 			infos.push_back(info(i));
 		}
@@ -551,28 +556,58 @@ struct ripser {
 
 	void add_reduction_record(index_t dim, index_t j, time_point start) {
 		infos.at(dim).red_records.push_back(reduction_record(j, start));
-		if(config.print_progress) {
-			std::cout << "  "
-			          << (j+1) << "/"
-			          << infos.at(dim).simplex_reduction_count << std::flush;
-		}
 	}
 
 	void complete_reduction_record(index_t dim, time_point end,
 	                               index_t add_count,
 	                               index_t add_app_count,
 	                               index_t coboundary_count) {
+		//TODO(seb): hacky hacky hacky output handling
+		static index_t thresh_counter = -1;
+		static index_t curr_dim = -1;
+		static index_t thresh_lim = 10;
+		static index_t thresh_linelim = 50;
 		reduction_record& rec = infos.at(dim).red_records.back();
 		rec.end = end;
 		rec.addition_count = add_count;
 		rec.addition_apparent_count = add_app_count;
 		rec.coboundary_element_count = coboundary_count;
 		if(config.print_progress) {
-			index_t ms = (index_t) (get_duration(rec.start, end).count() * 1000.0);
-			std::cout << " :: tim=(" << ms << "ms)"
-			          << " :: add=(" << add_count << "/" << add_app_count << ")"
-			          << " :: ele=" << coboundary_count
-			          << std::endl;
+			if(dim > curr_dim) {
+				if(curr_dim >= 0) {
+					std::cout << std::endl;
+				}
+				std::cout << "reduction progress in dim=" << dim << std::endl;
+				curr_dim = dim;
+				thresh_counter = -1;
+			}
+			if(add_count + add_app_count < thresh_lim) {
+				if(thresh_counter == 0) {
+				  std::cout << std::endl << "  ";
+				}
+				if(thresh_counter == -1) {
+					thresh_counter++;
+					std::cout << "  ";
+				}
+				std::cout << "." << std::flush;
+				thresh_counter = (thresh_counter + 1) % (thresh_linelim - 2);
+			} else {
+				index_t ms = (index_t)
+					(get_duration(rec.start, end).count() * 1000.0);
+				if(thresh_counter > 0) {
+					std:: cout << std::endl;
+				}
+				// was previously in add_red_record
+				std::cout << "  "
+						  << (rec.j+1) << "/"
+						  << infos.at(dim).simplex_reduction_count;
+				std::cout << " :: tim=(" << std::setw(6) << ms << "ms)"
+						  << " :: add=(" << std::setw(5) << add_count << "/"
+						  << std::setw(5) << add_app_count << ")"
+						  << " :: cob=" << std::setw(4) << coboundary_count
+						  << std::endl;
+				thresh_counter = -1;
+			}
 		}
 	}
 };
@@ -735,7 +770,7 @@ void add_simplex_coboundary(ripser& ripser,
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
 		// Threshold check
-		if(get_diameter(cofacet) <= ripser.config.threshold) {
+		if(get_diameter(cofacet) <= ripser.threshold) {
 			working_coboundary.push(cofacet);
 		}
 	}
@@ -780,7 +815,7 @@ void add_simplex_boundary(ripser &ripser,
 	facets.set_simplex(simplex, dim);
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
-		if(get_diameter(facet) <= ripser.config.threshold) {
+		if(get_diameter(facet) <= ripser.threshold) {
 			working_boundary.push(facet);
 		}
 	}
@@ -861,7 +896,7 @@ std::vector<index_diameter_t> get_edges(ripser& ripser) {
 		ripser.get_simplex_vertices(index, 1, ripser.dist.size(), vertices);
 		value_t length = ripser.dist(vertices[0], vertices[1]);
 		// Threshold check
-		if(length <= ripser.config.threshold) {
+		if(length <= ripser.threshold) {
 			edges.push_back(std::make_pair(index, length));
 		}
 	}
@@ -978,14 +1013,14 @@ ripser_config read_config(char* configpath) {
 		if(name == "dim_max") {
 			config.dim_max = std::stoi(string_value);
 		}
-		if(name == "dim_threshold") {
-			config.dim_threshold = std::stoi(string_value);
-		}
 		if(name == "ratio") {
 			config.ratio = std::stod(string_value);
 		}
+		if(name == "use_enclosing_threshold") {
+			config.use_enclosing_threshold = (string_value == "true") || (string_value == "1");
+		}
 		if(name == "threshold") {
-			config.threshold = std::stod(string_value);
+			config.config_threshold = std::stod(string_value);
 		}
 		if(name == "print_progress") {
 			config.print_progress = (string_value == "true") || (string_value == "1");
