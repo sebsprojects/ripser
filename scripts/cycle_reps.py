@@ -37,12 +37,12 @@ if len(sys.argv) < 2:
     print("error: missing config file-path")
 
 config_path = sys.argv[1]
+output_file_path = sys.argv[2]
 cp = configparser.ConfigParser()
 cp.read(config_path)
 
 input_path = cp["ripser"]["file_path"]
 input_type = cp["ripser"]["input_type"]
-output_path = cp["ripser"]["output_path"]
 relative_subcomplex_string = cp["ripser"]["relative_subcomplex"]
 relative_subcomplex = []
 
@@ -63,7 +63,7 @@ if not relative_subcomplex_string == "":
         relative_subcomplex.append([start, end])
 
 
-def read_samples(input_path, dims=[0,1]):
+def read_samples(dims=[0,1]):
     input_file = open(input_path, "r")
     data = [[], []]
     for (i, line) in enumerate(input_file):
@@ -88,16 +88,21 @@ def read_samples(input_path, dims=[0,1]):
             xy[1].append(dat[1])
     return [data, xy, rxy]
 
-def read_reps(input_path, output_path):
-    reps_filename = output_path + "/" + input_path.split("/")[-1] + "_reps.txt"
-    reps_file = open(reps_filename, "r");
+def read_reps():
+    reps_file = open(output_file_path, "r");
     reps = []
+    current_rep = { "dim": -1, "birth": -1, "death": -1, "rep": []}
     for line in reps_file:
         if line.startswith("#"):
-            interval = list(map(float, line[1:].split()))
-            reps.append({ "birth": interval[0], "death": interval[1], "rep": []})
+            if current_rep["dim"] == 1:
+                reps.append(current_rep)
+            current_rep = { "dim": -1, "birth": -1, "death": -1, "rep": []}
+            toks = list(line[1:].split())
+            current_rep["dim"] = int(toks[0].split('=')[1])
+            current_rep["birth"] = float(toks[-2])
+            current_rep["death"] = float(toks[-1])
         elif not line == "\n":
-            reps[-1]["rep"].append(list(map(int, line.split())))
+            current_rep["rep"].append(list(map(int, line.split())))
     return reps
 
 def plot_samples(data_abs, data_rel):
@@ -129,11 +134,11 @@ def verify_reps(reps):
                 pass
                 #print("ERROR", rep, key, val)
 
-data_all, data_abs, data_rel = read_samples(input_path)
-reps = read_reps(input_path, output_path)
+data_all, data_abs, data_rel = read_samples()
+reps = read_reps()
 
 plot_samples(data_abs, data_rel)
-plot_reps(reps, data_all, [0])
+plot_reps(reps, data_all, [0,1,2,3,4])
 plt.show()
 #verify_reps(reps)
 #plot_samples(data_abs, data_rel)

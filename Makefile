@@ -38,7 +38,6 @@ ripser_hrep_cohomhom_o3:
 ripser_hrep_cohominv_o3:
 	c++ -std=c++11 -Wall ripser_hrep_cohom_inverse_implicit.cpp -o ripser_hrep_cohominv_o3 -O3
 
-
 ripser_rel_cohom_o3:
 	c++ -std=c++11 -Wall ripser_rel_cohom.cpp -o ripser_rel_cohom_o3 -O3
 

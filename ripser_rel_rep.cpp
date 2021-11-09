@@ -374,8 +374,8 @@ int main(int argc, char** argv) {
 	ripser ripser(config);
 	print_config(ripser);
 	compute_barcodes(ripser);
-	//print_barcodes(ripser);
+	print_barcodes(ripser);
 	print_infos(ripser);
-	//write_dim1_cycles(ripser);
+	write_barcode(ripser, true);
 	exit(0);
 }

@@ -184,7 +184,7 @@ void print_mat(compressed_sparse_matrix& mat) {
 }
 
 void print_barcode(ripser& ripser, barcode& barcode) {
-	std::cout << "persistence intervals in dim " << barcode.dim << ":" << std::endl;
+	std::cout << std::endl << "persistence intervals in dim " << barcode.dim << ":" << std::endl;
 	std::sort(barcode.hom_classes.begin(),
 	          barcode.hom_classes.end(),
 	          homology_class_print_order);
@@ -197,6 +197,12 @@ void print_barcode(ripser& ripser, barcode& barcode) {
 		} else {
 			std::cout << "," << death << ") :: ";
 		}
+		std::cout << "[" << get_index(hc.birth);
+		if(death == INF) {
+			std::cout << ", ) :: ";
+		} else {
+			std::cout << "," << get_index(hc.death) << ") :: ";
+		}
 		for(index_diameter_t simp : hc.representative) {
 			print_simplex(ripser, get_index(simp), barcode.dim);
 			std::cout << " ";
@@ -205,33 +211,114 @@ void print_barcode(ripser& ripser, barcode& barcode) {
 	}
 }
 
-void write_dim1_cycles(ripser& ripser) {
-	barcode& barcode = ripser.barcodes.at(1);
-	std::sort(barcode.hom_classes.begin(),
-	          barcode.hom_classes.end(),
-	          homology_class_order);
-	std::string ip = ripser.config.file_path;
-	std::string dataset_name = ip.substr(ip.find_last_of("/\\") + 1);
-	std::string filename = ripser.config.output_path + "/" + dataset_name + "_reps.txt";
-	std::ofstream ofs(filename, std::ofstream::trunc);
-	for(auto hc : barcode.hom_classes) {
-		ofs << "# " << std::max(0.0f, get_diameter(hc.birth)) << " "
-		     << get_diameter(hc.death) << std::endl;
-		std::vector<index_t> vertices(2, -1);
-		for(index_diameter_t simplex : hc.representative) {
-			ripser.get_simplex_vertices(get_index(simplex), 1, ripser.n, vertices);
-			ofs << vertices.at(0) << " " << vertices.at(1) << std::endl;
-		}
-		ofs << std::endl;
-	}
-	ofs.close();
-}
-
 void print_barcodes(ripser& ripser) {
 	std::sort(ripser.barcodes.begin(), ripser.barcodes.end(), barcode_order);
 	for(auto b : ripser.barcodes) {
 		print_barcode(ripser, b);
 	}
+}
+
+void write_barcode(ripser& ripser, bool include_reps=false) {
+	std::string ip = ripser.config.file_path;
+	std::string dataset_name = ip.substr(ip.find_last_of("/\\") + 1);
+	std::string rel_name = "rel";
+	for(index_t i = 0; i < ripser.config.relative_subcomplex.size(); i++) {
+		rel_name += std::to_string(ripser.config.relative_subcomplex.at(i).first);
+		rel_name += "-" + std::to_string(ripser.config.relative_subcomplex.at(i).second);
+		if(i < ripser.config.relative_subcomplex.size() - 1) {
+			rel_name += "x";
+		}
+	}
+	if(ripser.config.relative_subcomplex.empty()) {
+		rel_name = "relnone";
+	}
+	std::string thresh_name = "thresh" + std::to_string(ripser.threshold);
+	thresh_name.erase(thresh_name.find_last_not_of('0') + 1, std::string::npos);
+	std::replace(thresh_name.begin(), thresh_name.end(), '.', 'd');
+	std::string rep_name = (include_reps ? "_reps" : "");
+	std::string filename = ripser.config.output_path + "/"
+		+ dataset_name
+		+ rep_name + "_"
+		+ thresh_name + "_"
+		+ rel_name
+		+ ".txt";
+	std::ofstream ofs(filename, std::ofstream::trunc);
+	// CONFIG
+	ripser_config& config = ripser.config;
+	ofs << "# CONFIG" << std::endl;
+	ofs << "#  dataset at file path :: " << config.file_path << std::endl;
+	ofs << "#  output at file path :: " << config.output_path << std::endl;
+	ofs << "#  dataset input type :: " << config.input_type << std::endl;
+	ofs << "#  dim max :: " << config.dim_max << std::endl;
+	ofs << "#  ratio :: " << config.ratio << std::endl;
+	ofs << "#  threshold :: " << ripser.threshold;
+	if(config.use_enclosing_threshold) {
+		ofs << " (enclosing threshold)" << std::endl;
+	} else if(config.config_threshold < 0) {
+		ofs << " (maximum distance)" << std::endl;
+	} else {
+		ofs << std::endl;
+	}
+	ofs << "#  use union find :: " << config.use_union_find << std::endl;
+	ofs << "#  relative :: ";
+	if(config.relative_subcomplex.size() == 0) {
+		ofs << "(empty)" << std::endl;
+	} else {
+		auto pair = config.relative_subcomplex.at(0);
+		ofs << pair.first << "-" << pair.second;
+		for(index_t i = 1; i < (index_t) config.relative_subcomplex.size(); i++) {
+			pair = config.relative_subcomplex.at(i);
+			ofs << "," << pair.first << "-" << pair.second;
+		}
+	}
+	ofs << std::endl << std::endl;
+	// INFO
+	for(auto info : ripser.infos) {
+		ofs << "# INFO in dim " << info.dim << ":" << std::endl;
+		ofs << "#  total simplex count:     "
+				  << info.simplex_total_count << std::endl;
+		ofs << "#  reduction simplex count: "
+				  << info.simplex_reduction_count << std::endl;
+
+		ofs << "#  clearing count:          "
+				  << info.clearing_count << std::endl;
+		ofs << "#  emergent count:          "
+				  << info.emergent_count << std::endl;
+		ofs << "#  apparent count:          "
+				  << info.apparent_count << std::endl;
+
+		ofs << "#  assemble duration:       "
+				  << info.assemble_dur.count() << "s" << std::endl;
+		ofs << "#  reduction duration:      "
+				  << info.reduction_dur.count() << "s" << std::endl;
+		ofs << "#  representative duration: "
+				  << info.representative_dur.count() << "s" << std::endl;
+		ofs << "#  class count: "
+			      << ripser.barcodes.at(info.dim).hom_classes.size()
+				  << std::endl << std::endl;
+	}
+	// BARCODE AND REPS
+	for(auto barcode : ripser.barcodes) {
+		std::sort(barcode.hom_classes.begin(),
+				  barcode.hom_classes.end(),
+				  homology_class_print_order);
+		for(auto hc : barcode.hom_classes) {
+			ofs << barcode.dim << " :: "
+				<< std::max(0.0f, get_diameter(hc.birth)) << " "
+				<< get_diameter(hc.death) << " :: "
+				<< get_index(hc.birth) << " "
+				<< get_index(hc.death) << " :: ";
+			if(include_reps) {
+				std::vector<index_t> vertices(2, -1);
+				for(index_diameter_t simplex : hc.representative) {
+					ripser.get_simplex_vertices(get_index(simplex), 1, ripser.n, vertices);
+					ofs << vertices.at(0) << " " << vertices.at(1) << ", ";
+				}
+			}
+			ofs << std::endl;
+		}
+	}
+	ofs.close();
 }
 
 void print_info(ripser& ripser, info& info) {
@@ -254,7 +341,8 @@ void print_info(ripser& ripser, info& info) {
 	std::cout << "  reduction duration:      "
 	          << info.reduction_dur.count() << "s" << std::endl;
 	std::cout << "  representative duration: "
-	          << info.representative_dur.count() << "s" << std::endl << std::endl;
+	          << info.representative_dur.count() << "s" << std::endl;
+	std::cout << "  class count: " << ripser.barcodes.at(info.dim).hom_classes.size() << std::endl << std::endl;
 
 	for(size_t i = 0; i < info.misc_durs.size(); i++) {
 	  std::cout << "  misc dur #" << i << ": " << info.misc_durs.at(i).count()
@@ -278,6 +366,7 @@ void print_config(ripser& ripser) {
 	} else {
 		std::cout << std::endl;
 	}
+	std::cout << "  use union find :: " << config.use_union_find << std::endl;
 	std::cout << "  relative :: ";
 	if(config.relative_subcomplex.size() == 0) {
 		std::cout << "(empty)" << std::endl;

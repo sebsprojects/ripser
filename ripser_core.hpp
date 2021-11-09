@@ -426,6 +426,7 @@ struct ripser_config {
 	value_t ratio;
 	value_t config_threshold;
 	bool use_enclosing_threshold;
+	bool use_union_find;
 	bool print_progress;
 	std::vector<std::pair<index_t, index_t>> relative_subcomplex;
 
@@ -437,6 +438,7 @@ struct ripser_config {
 		  ratio(1.0),
 		  config_threshold(-1.0),
 		  use_enclosing_threshold(false),
+		  use_union_find(false),
 		  print_progress(false),
 		  relative_subcomplex()
   { }
@@ -513,6 +515,13 @@ struct ripser {
 			vertices.at(k - 1) = n;
 			idx -= binomial_coeff(n, k);
 		}
+	}
+
+	index_t get_first_relative_vertex() const {
+		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
+			return config.relative_subcomplex.at(i).first;
+		}
+		return -1;
 	}
 
 	bool is_relative_vertex(index_t idx) const {
@@ -859,7 +868,9 @@ struct union_find {
 	std::vector<uint8_t> rank;
 
 	union_find(const index_t n) : parent(n), rank(n, 0) {
-		for (index_t i = 0; i < n; ++i) parent[i] = i;
+		for (index_t i = 0; i < n; ++i) {
+			parent[i] = i;
+		}
 	}
 
 	index_t find(index_t x) {
@@ -914,7 +925,10 @@ index_diameter_t get_zero_pivot_facet(ripser& ripser, index_diameter_t simplex, 
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
 		if(get_diameter(facet) == get_diameter(simplex)) {
-			return facet;
+			// Relative check
+			if(!ripser.is_relative_simplex(get_index(facet), dim - 1)) {
+				return facet;
+			}
 		}
 	}
 	return index_diameter_t(-1, 0);
@@ -1018,6 +1032,9 @@ ripser_config read_config(char* configpath) {
 		}
 		if(name == "use_enclosing_threshold") {
 			config.use_enclosing_threshold = (string_value == "true") || (string_value == "1");
+		}
+		if(name == "use_union_find") {
+			config.use_union_find = (string_value == "true" || (string_value == "1"));
 		}
 		if(name == "threshold") {
 			config.config_threshold = std::stod(string_value);
