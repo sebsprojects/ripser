@@ -128,6 +128,15 @@ struct compressed_lower_distance_matrix {
 		return i == j ? 0 : i < j ? rows[j][i] : rows[i][j];
 	}
 
+	void set_entry(const index_t i, const index_t j, const value_t val) {
+		if(i < j) {
+			rows[j][i] = val;
+		}
+		if(i > j) {
+			rows[i][j] = val;
+		}
+	}
+
 	size_t size() const {
 	  return rows.size();
 	}
@@ -304,6 +313,7 @@ value_t compute_max_distance(const DistanceMatrix& dist) {
 	return max;
 }
 
+
 /* **************************************************************************
  * Types for Reduction Algorithm
  * *************************************************************************/
@@ -335,35 +345,26 @@ typedef std::unordered_map<index_t,
  * *************************************************************************/
 
 struct homology_class {
+	index_t dim;
 	index_diameter_t birth;
 	index_diameter_t death;
 	std::vector<index_diameter_t> representative;
 
-	homology_class(index_diameter_t _birth, index_diameter_t _death, std::vector<index_diameter_t> rep)
-		: birth(_birth),
+	homology_class(index_t _dim, index_diameter_t _birth, index_diameter_t _death, std::vector<index_diameter_t> rep)
+		: dim(_dim),
+		  birth(_birth),
 		  death(_death),
 		  representative(rep)
 	{ }
 };
 
-struct barcode {
-	index_t dim;
-	std::vector<homology_class> hom_classes;
-
-	barcode(index_t _dim)
-		: dim(_dim),
-		  hom_classes()
-	{ }
-};
-
-bool barcode_order(const barcode& a, const barcode& b) {
-	return a.dim < b.dim;
-}
-
 bool homology_class_print_order(homology_class& a, homology_class& b) {
-	return (get_diameter(a.birth) < get_diameter(b.birth)) ||
-	       (get_diameter(a.birth) == get_diameter(b.birth) &&
-	        get_diameter(a.death) < get_diameter(b.death));
+	return (a.dim < b.dim) ||
+	       ((a.dim == b.dim) &&
+	        (get_diameter(a.birth) < get_diameter(b.birth))) ||
+	       ((a.dim == b.dim) &&
+	        (get_diameter(a.birth) == get_diameter(b.birth)) &&
+	        (get_diameter(a.death) < get_diameter(b.death)));
 }
 
 bool homology_class_order(homology_class& a, homology_class& b) {
@@ -395,18 +396,18 @@ struct info {
 	size_t apparent_count;
 	size_t simplex_total_count;
 	size_t simplex_reduction_count;
+	size_t class_count;
 	
 	duration assemble_dur;
 	duration reduction_dur;
 	duration representative_dur;
 
-	std::vector<duration> misc_durs;
 	std::vector<reduction_record> red_records;
 
 	info(index_t _dim)
 		: dim(_dim), clearing_count(0), emergent_count(0), apparent_count(0),
-		  simplex_total_count(0), simplex_reduction_count(0),
-		  assemble_dur(), reduction_dur(), representative_dur(), misc_durs()
+		  simplex_total_count(0), simplex_reduction_count(0), class_count(0),
+		  assemble_dur(), reduction_dur(), representative_dur()
 	{ }
 };
 
@@ -427,6 +428,7 @@ struct ripser_config {
 	value_t config_threshold;
 	bool use_enclosing_threshold;
 	bool use_union_find;
+	bool use_zero_dist_rel;
 	bool print_progress;
 	std::vector<std::pair<index_t, index_t>> relative_subcomplex;
 
@@ -439,6 +441,7 @@ struct ripser_config {
 		  config_threshold(-1.0),
 		  use_enclosing_threshold(false),
 		  use_union_find(false),
+		  use_zero_dist_rel(false),
 		  print_progress(false),
 		  relative_subcomplex()
   { }
@@ -446,13 +449,13 @@ struct ripser_config {
 
 struct ripser {
 
-	const DistanceMatrix dist;
+	mutable DistanceMatrix dist;
 	const index_t n;
 	const binomial_coeff_table binomial_coeff;
 
 	mutable ripser_config config;
 	mutable value_t threshold;
-	mutable std::vector<barcode> barcodes;
+	mutable std::vector<homology_class> hom_classes;
 	mutable std::vector<info> infos;
 
 	ripser(ripser_config _config)
@@ -461,7 +464,7 @@ struct ripser {
 		  binomial_coeff(n, _config.dim_max + 2),
 		  config(_config),
 		  threshold(-1),
-		  barcodes(),
+		  hom_classes(),
 		  infos()
 	{
 		if(config.use_enclosing_threshold) {
@@ -473,13 +476,16 @@ struct ripser {
 			threshold = config.config_threshold;
 		}
 		for(index_t i = 0; i <= config.dim_max; ++i) {
-			barcodes.push_back(barcode(i));
 			infos.push_back(info(i));
 		}
 		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
 			if(config.relative_subcomplex.at(i).second == -1) {
 				config.relative_subcomplex.at(i).second = n - 1;
 			}
+		}
+		if(config.use_zero_dist_rel) {
+			set_relative_zero_distance();
+			config.relative_subcomplex.clear();
 		}
 	}
 	
@@ -514,6 +520,16 @@ struct ripser {
 			n = get_max_vertex(idx, k, n);
 			vertices.at(k - 1) = n;
 			idx -= binomial_coeff(n, k);
+		}
+	}
+	
+	void set_relative_zero_distance() {
+		for(index_t i = 0; i < n; i++) {
+			for(index_t j = i + 1; j < n; j++) {
+				if(is_relative_vertex(i) && is_relative_vertex(j)) {
+					dist.set_entry(i, j, 0);
+				}
+			}
 		}
 	}
 
@@ -560,7 +576,7 @@ struct ripser {
 	}
 
 	void add_hom_class(index_t dim, index_diameter_t birth, index_diameter_t death, std::vector<index_diameter_t> rep = std::vector<index_diameter_t>()) {
-		barcodes.at(dim).hom_classes.push_back(homology_class(birth, death, rep));
+		hom_classes.push_back(homology_class(dim, birth, death, rep));
 	}
 
 	void add_reduction_record(index_t dim, index_t j, time_point start) {
@@ -574,7 +590,7 @@ struct ripser {
 		//TODO(seb): hacky hacky hacky output handling
 		static index_t thresh_counter = -1;
 		static index_t curr_dim = -1;
-		static index_t thresh_lim = 10;
+		static index_t thresh_lim = 0;
 		static index_t thresh_linelim = 50;
 		reduction_record& rec = infos.at(dim).red_records.back();
 		rec.end = end;
@@ -1035,6 +1051,9 @@ ripser_config read_config(char* configpath) {
 		}
 		if(name == "use_union_find") {
 			config.use_union_find = (string_value == "true" || (string_value == "1"));
+		}
+		if(name == "use_zero_dist_rel") {
+			config.use_zero_dist_rel = (string_value == "true" || (string_value == "1"));
 		}
 		if(name == "threshold") {
 			config.config_threshold = std::stod(string_value);
