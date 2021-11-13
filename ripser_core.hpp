@@ -47,6 +47,28 @@ value_t get_diameter(const index_diameter_t i) {
  * Binomial Numbering System and Ordering
  * *************************************************************************/
 
+typedef bool (simplex_order(const index_diameter_t&, const index_diameter_t&));
+typedef bool (total_simplex_order(const std::pair<index_t, index_diameter_t>&,
+                                  const std::pair<index_t, index_diameter_t>&));
+
+bool total_filtration_order(const std::pair<index_t, index_diameter_t>& a,
+                            const std::pair<index_t, index_diameter_t>& b)
+{
+	return (get_diameter(a.second) < get_diameter(b.second)) ||
+	       ((get_diameter(a.second) == get_diameter(b.second)) &&
+	        (a.first < b.first)) ||
+	       ((get_diameter(a.second) == get_diameter(b.second)) &&
+	        (a.first == b.first) &&
+	        (get_index(a.second) > get_index(b.second)));
+}
+
+bool total_reverse_filtration_order(const std::pair<index_t, index_diameter_t>& a,
+                                    const std::pair<index_t, index_diameter_t>& b)
+{
+	return total_filtration_order(b, a);
+}
+
+
 // a < b iff diam(a) < diam(b), if equal index(a) > index(b)
 bool filtration_order(const index_diameter_t& a,
                       const index_diameter_t& b) {

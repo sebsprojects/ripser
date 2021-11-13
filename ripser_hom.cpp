@@ -174,10 +174,11 @@ int main(int argc, char** argv) {
 	ripser ripser(config);
 	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
+	output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_output(ripser);
+	write_standard_output(ripser, false, true);
 	exit(0);
 }
 
