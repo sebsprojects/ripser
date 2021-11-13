@@ -114,7 +114,6 @@ def plot_barcode(max_bound, intervals):
     #ax2.set_xticks(ax.get_xticks())
     #ax2.spines["right"].set_visible(False)
     #ax2.spines["left"].set_visible(False)
-    fig.set_figheight(h * 0.5)
 
 
 # MAIN

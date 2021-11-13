@@ -81,7 +81,8 @@ void output_simplices_by_dim(ripser& ripser, std::ostream& os,
 	for(index_t i = 0; i <= ripser.config.dim_max; i++) {
 		std::string p = pref ? ("#s" + std::to_string(i) + " ") : "";
 		if(dim == -1 || i == dim) {
-			os << (pref ? "# " : "") << "simplices in dim=" << std::to_string(i) << std::endl;
+			os << (pref ? "# " : "") << "simplices in dim="
+			   << std::to_string(i) << std::endl;
 			for(auto& s : simpl_curr) {
 				os << p << "  "
 				   << simplex_tos(ripser, s, i, true, (i != 0), false)
