@@ -67,18 +67,33 @@ def read_simplices():
             simplices.append(vertices)
     return simplices
 
-def init_ax(ax, i):
+def get_limits(points):
+    x_lim = [points[0][0], points[0][0]]
+    y_lim = [points[0][1], points[0][1]]
+    for p in points[1:]:
+        x_lim[0] = min(p[0], x_lim[0])
+        x_lim[1] = max(p[0], x_lim[1])
+        y_lim[0] = min(p[1], y_lim[0])
+        y_lim[1] = max(p[1], y_lim[1])
+    x_len = x_lim[1] - x_lim[0]
+    y_len = y_lim[1] - y_lim[0]
+    x_mid = x_lim[0] + 0.5 * x_len
+    y_mid = y_lim[0] + 0.5 * y_len
+    offs = 0.65 * max(x_len, y_len)
+    return [x_mid - offs, x_mid + offs], [y_mid - offs, y_mid + offs]
+
+def init_ax(ax, xlim, ylim, i):
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
     ax.set_aspect("equal")
-    ax.set_xlim([-1.2, 1.2])
-    ax.set_ylim([-1.2, 1.2])
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_title(r'$K_{' + str(i) + "}$")
 
-
 def plot_filtration(axs, simplices, points):
+    xlim, ylim = get_limits(points)
     for i in range(len(simplices)):
-        init_ax(axs[i], i + 1)
+        init_ax(axs[i], xlim, ylim, i + 1)
         for j in range(i + 1):
             dim = len(simplices[j])
             c = colors[1] if i == j else colors[0]

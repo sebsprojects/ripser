@@ -8,7 +8,7 @@ import math
 import sys
 from functools import cmp_to_key
 
-if len(sys.argv) < 1:
+if len(sys.argv) < 2:
     print("error: missing config file-path")
     sys.exit()
 
@@ -17,7 +17,6 @@ if len(sys.argv) < 1:
 dims = [0,1,2]
 doc_w = 418.25372 / 72
 figw = doc_w * 1.2  # FACTOR 1 TOO SMALL FOR SOME STUPID REASON
-input_file = sys.argv[1]
 
 
 # MATPLOTLIB SETUP
@@ -37,7 +36,6 @@ tex_fonts = {
     'text.latex.preamble': r'\usepackage{amsfonts}'
 }
 plt.rcParams.update(tex_fonts)
-fig, ax = plt.subplots(figsize=(figw, figw))
 
 
 # FUNCTION DEFS
@@ -51,7 +49,7 @@ def comp_bar(a, b):
     else:
         return 1
 
-def read_barcode(simplex_lookup):
+def read_barcode(input_file, simplex_lookup):
     f = open(input_file, "r");
     intervals = []
     max_bound = 0
@@ -78,23 +76,25 @@ def read_barcode(simplex_lookup):
         intervals[dim][1] = sorted(intervals[dim][1], key=cmp_to_key(comp_bar))
     return (max_bound, intervals)
 
-def read_simplices():
+def read_simplices(input_file, exclude_rel=False):
     f = open(input_file, "r")
     simplex_lookup = []
+    rel = range(8)
     for line in f:
         if line.startswith("#s"):
             dim = int(line[2])
             index = int(line[3:].split("-")[0].strip())
+            #simplices = [int(s.strip()) for s in line[3:].split("-")[1].split("'")]
             simplex_lookup.append([dim, index])
     return simplex_lookup
 
-def plot_barcode(max_bound, intervals):
-    h_inc = (max_bound + 1) * 0.02
+def plot_barcode(ax, max_bound, intervals):
+    h_inc = (max_bound + 1) * 0.01
     h_skip = h_inc * 1.5
     h = 0
     ax.set_xlim(1, max_bound+1)
-    ax.set_xticks(range(1, max_bound+1))
-    ax.xaxis.grid(True, linestyle="dotted")
+    #ax.set_xticks(range(1, max_bound+1))
+    #ax.xaxis.grid(True, linestyle="dotted")
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -108,7 +108,7 @@ def plot_barcode(max_bound, intervals):
                 h += h_inc
     h += h_skip
     ax.set_ylim(0,h)
-    ax.set_aspect("equal")
+    #ax.set_aspect("equal")
     #ax2 = ax.twiny()
     #ax2.set_xlim(ax.get_xlim())
     #ax2.set_xticks(ax.get_xticks())
@@ -119,8 +119,19 @@ def plot_barcode(max_bound, intervals):
 # MAIN
 # -----------------------------------------------------------------------------
 
-simplex_lookup = read_simplices()
-max_bound, intervals = read_barcode(simplex_lookup)
-plot_barcode(max_bound, intervals)
-plt.savefig("../thesis/img/test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+n = len(sys.argv) - 1
+fig, axs = plt.subplots(n, 1, figsize=(figw, figw))
+
+max_b = 0
+for i in range(n):
+    input_file = sys.argv[i + 1]
+    simplex_lookup = read_simplices(input_file)
+    max_bound, intervals = read_barcode(input_file, simplex_lookup)
+    max_b = max(max_b, max_bound)
+    plot_barcode((axs if n == 1 else (axs.flat[i])), max_bound, intervals)
+for i in range(n):
+    if n > 1:
+        axs.flat[i].set_xlim(1, max_b+1)
+#plt.savefig("../thesis/img/test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("index_rand16_abs_0-7_0-11.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()

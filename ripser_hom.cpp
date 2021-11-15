@@ -63,15 +63,15 @@ void update_hom_class(ripser& ripser,
                       std::vector<index_diameter_t> R_rep) {
 	for(homology_class& h : ripser.hom_classes) {
 		if(h.dim == dim - 1 && get_index(h.birth) == get_index(birth)) {
-			//std::cout << "d=" << dim - 1 << " :: ";
-			//for(auto s : h.representative) {
-			//	std::cout << get_index(s) << " ";
-			//}
-			//std::cout << "vs ";
-			//for(auto s : R_rep) {
-			//	std::cout << get_index(s) << " ";
-			//}
-			//std::cout << std::endl;
+			std::cout << "d=" << dim - 1 << " :: ";
+			for(auto s : h.representative) {
+				std::cout << get_index(s) << " ";
+			}
+			std::cout << "vs ";
+			for(auto s : R_rep) {
+				std::cout << get_index(s) << " ";
+			}
+			std::cout << std::endl;
 			h.death = death;
 			break;
 		}

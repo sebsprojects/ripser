@@ -20,7 +20,6 @@ if len(sys.argv) < 1:
 dims = [0,1,2]
 doc_w = 418.25372 / 72
 figw = doc_w * 1.2  # FACTOR 1 TOO SMALL FOR SOME STUPID REASON
-input_file = sys.argv[1]
 
 
 # MATPLOTLIB SETUP
@@ -40,7 +39,6 @@ tex_fonts = {
     'text.latex.preamble': r'\usepackage{amsfonts}'
 }
 plt.rcParams.update(tex_fonts)
-fig, ax = plt.subplots()
 
 
 # FUNCTION DEFS
@@ -54,7 +52,7 @@ def comp_bar(a, b):
     else:
         return 1
 
-def read_barcode():
+def read_barcode(input_file):
     f = open(input_file, "r");
     intervals = []
     max_bound = 0
@@ -83,13 +81,13 @@ def read_barcode():
         intervals[dim][1] = sorted(intervals[dim][1], key=cmp_to_key(comp_bar))
     return (sorted(list(set(bounds))), intervals)
 
-def plot_barcode(bounds, intervals):
+def plot_barcode(ax, bounds, intervals):
     h_inc = (bounds[-1] * 1.1) * 0.02
     h_skip = h_inc * 1.5
     h = 0
     ax.set_xlim(0, bounds[-1] * 1.1)
-    ax.set_xticks(bounds)
-    ax.xaxis.grid(True, linestyle="dotted")
+    #ax.set_xticks(bounds)
+    #ax.xaxis.grid(True, linestyle="dotted")
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -101,7 +99,7 @@ def plot_barcode(bounds, intervals):
             continue
         h += h_skip
         for b in bars:
-            print(b, h)
+            #print(b, h)
             ax.plot(b, [h, h], color=colors[dim])
             if b != bars[-1]:
                 h += h_inc
@@ -112,14 +110,20 @@ def plot_barcode(bounds, intervals):
     #ax2.set_xticks(bounds)
     #ax2.spines["right"].set_visible(False)
     #ax2.spines["left"].set_visible(False)
-    ax.set_aspect("equal")
-    fig.set_figwidth(figw)
+    #ax.set_aspect("equal")
+    #fig.set_figwidth(figw)
 
 
 # MAIN
 # -----------------------------------------------------------------------------
 
-bounds, intervals = read_barcode()
-plot_barcode(bounds, intervals)
-plt.savefig("../thesis/img/test1.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+n = len(sys.argv) - 1
+fig, axs = plt.subplots(n, 1, figsize=(figw, figw))
+
+for i in range(n):
+    input_file = sys.argv[i + 1]
+    bounds, intervals = read_barcode(input_file)
+    plot_barcode((axs if n == 1 else (axs.flat[i])), bounds, intervals)
+#plt.savefig("../thesis/img/test1.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("diam_rand16_abs_0-7_0-11.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()

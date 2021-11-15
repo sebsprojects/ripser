@@ -43,9 +43,10 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			}
 		}
 	}
-	for(index_diameter_t cofacet : working_coboundary_buffer) {
-		working_coboundary.push(cofacet);
-	}
+	//for(index_diameter_t cofacet : working_coboundary_buffer) {
+	//	working_coboundary.push(cofacet);
+	//	print_simplex(ripser, cofacet, dim + 1); std::cout << std::endl;
+	//}
 	return get_pivot(working_coboundary);
 }
 
@@ -73,11 +74,11 @@ void assemble_columns_to_reduce(ripser &ripser,
 					if(pivot_column_index.find(get_index(cofacet)) ==
 					   pivot_column_index.end()) {
 						// Apparent Pair check
-						if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
+						//if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
 							columns_to_reduce.push_back(cofacet);
-						} else {
-							info.apparent_count++;
-						}
+						//} else {
+						//	info.apparent_count++;
+						//}
 					} else {
 						info.clearing_count++;
 					}
@@ -90,6 +91,16 @@ void assemble_columns_to_reduce(ripser &ripser,
               reverse_filtration_order);
 	// TODO: Is this sort necessary?
 	//std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
+	//if(dim == 1) {
+	//	index_t nonzerocount = 0;
+	//	for(auto s : columns_to_reduce) {
+	//		//print_simplex(ripser, s, dim); std::cout << std::endl;
+	//		if(get_diameter(s) > 0) {
+	//			nonzerocount++;
+	//		}
+	//	}
+	//	std::cout << "NONZEROCOUNT: " << nonzerocount << std::endl;
+	//}
 	info.assemble_dur = get_duration(assemble_start, get_time());
 	info.simplex_reduction_count = columns_to_reduce.size();
 }
@@ -116,6 +127,7 @@ void compute_pairs(ripser &ripser,
 		// The reduction
 		index_t add_count = 0;
 		index_t app_count = 0;
+		//std::cout << "PIVOT: " << get_index(pivot) << std::endl;
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
@@ -155,6 +167,11 @@ void compute_pairs(ripser &ripser,
 		}
 		//TODO(seb): This may be expensive
 		index_t red_count = working_coboundary.size();
+		//e = pop_pivot(working_coboundary);
+		//while(get_index(e) != -1) {
+		//	red_count++;
+		//	e = pop_pivot(working_coboundary);
+		//}
 		ripser.complete_reduction_record(dim, get_time(), add_count,
 		                                 app_count, red_count);
 		// Determine Persistence Pair
@@ -296,10 +313,10 @@ int main(int argc, char** argv) {
 	}
 	ripser ripser(config);
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
+	output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, true);
+	write_standard_output(ripser, false, false);
 	exit(0);
 }
