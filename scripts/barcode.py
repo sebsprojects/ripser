@@ -125,5 +125,5 @@ for i in range(n):
     bounds, intervals = read_barcode(input_file)
     plot_barcode((axs if n == 1 else (axs.flat[i])), bounds, intervals)
 #plt.savefig("../thesis/img/test1.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
-plt.savefig("diam_rand16_abs_0-7_0-11.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("diam_rings100_abs_0-49_0-74.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()

@@ -300,6 +300,6 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, true);
+	//write_standard_output(ripser, false, true);
 	exit(0);
 }

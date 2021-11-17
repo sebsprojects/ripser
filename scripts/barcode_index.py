@@ -133,5 +133,5 @@ for i in range(n):
     if n > 1:
         axs.flat[i].set_xlim(1, max_b+1)
 #plt.savefig("../thesis/img/test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
-plt.savefig("index_rand16_abs_0-7_0-11.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("index_rings100_abs_0-49_0-74.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()

@@ -16,7 +16,9 @@ std::string simplex_tos(ripser& ripser,
 		ss << get_index(simplex);
 	}
 	if(include_simplices) {
-		ss << "-";
+		if(include_index) {
+		  ss << "-";
+		}
 		std::vector<index_t> vertices(dim+1, -1);
 		ripser.get_simplex_vertices(get_index(simplex), dim, ripser.n, vertices);
 		for(auto& i : vertices) {
@@ -27,7 +29,10 @@ std::string simplex_tos(ripser& ripser,
 		}
 	}
 	if(include_diameter) {
-		ss << "-" << std::fixed << std::setprecision(3)
+		if(include_index || include_simplices) {
+			ss << "-";
+		}
+		ss << std::fixed << std::setprecision(3)
 		   << get_diameter(simplex);
 	}
 	return ss.str();
@@ -106,43 +111,43 @@ void output_simplices_by_dim(ripser& ripser, std::ostream& os,
 
 void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, index_t dim=-1, bool pref=false)
 {
-	std::sort(ripser.hom_classes.begin(), ripser.hom_classes.end(),
-	          homology_class_print_order);
-	index_t current_dim = -1;
-	for(auto& hc : ripser.hom_classes) {
-		std::string p = pref ? ("#b" + std::to_string(hc.dim) + " ") : "";
-		if(hc.dim > current_dim) {
-			if(current_dim > -1) {
-				os << std::endl;
+	for(index_t d = 0; d < (index_t) ripser.hom_classes.size(); d++) {
+		if(!(dim == -1 || d == dim)) {
+			continue;
+		}
+		std::sort(ripser.hom_classes.at(d).begin(), ripser.hom_classes.at(d).end(),
+		          homology_class_print_order);
+		std::string p = pref ? ("#b" + std::to_string(d) + " ") : "";
+		os << (pref ? "# " : "") << "barcode in dim=" << d << std::endl;
+		for(auto& hc : ripser.hom_classes.at(d)) {
+			value_t birth = std::max(0.0f, get_diameter(hc.birth));
+			value_t death = std::max(0.0f, get_diameter(hc.death));
+			os << p << "  [" << birth;
+			if(death == INF) {
+				os << ", )";
+			} else {
+				os << "," << death << ")";
 			}
-			os << (pref ? "# " : "") << "barcode in dim=" << hc.dim
-			   << std::endl;
-			current_dim = hc.dim;
-		}
-		value_t birth = std::max(0.0f, get_diameter(hc.birth));
-		value_t death = get_diameter(hc.death);
-		os << p << "  [" << birth;
-		if(death == INF) {
-			os << ", )";
-		} else {
-			os << "," << death << ")";
-		}
-		os << " - [" << get_index(hc.birth);
-		if(death == INF) {
-			os << ", )";
-		} else {
-			os << "," << get_index(hc.death) << ")";
-		}
-		if(with_reps) {
-			os << " - ";
-			for(index_diameter_t& simp : hc.representative) {
-				os << simplex_tos(ripser, simp, hc.dim, false, true, false);
-				if(simp != hc.representative.back()) {
-					os << " ";
+			os << " - [" << get_index(hc.birth);
+			if(death == INF) {
+				os << ", )";
+			} else {
+				os << "," << get_index(hc.death) << ")";
+			}
+			if(with_reps) {
+				os << " - ";
+				for(index_diameter_t& simp : hc.representative) {
+					os << simplex_tos(ripser, simp, d, false, true, false);
+					if(simp != hc.representative.back()) {
+						os << " :: ";
+					}
 				}
 			}
+			os << std::endl;
 		}
-		os << std::endl;
+		if(d + 1 < (index_t) ripser.hom_classes.size()) {
+			std::cout << std::endl;
+		}
 	}
 }
 

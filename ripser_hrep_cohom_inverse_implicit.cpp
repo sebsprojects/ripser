@@ -3,14 +3,11 @@
 #include "ripser_core.hpp"
 #include "print_utils.hpp"
 
-// A working column is represented by this type. The entries are ordered with
-// respect to reverse filtration order
+
 typedef std::priority_queue<index_diameter_t,
                             std::vector<index_diameter_t>,
                             reverse_filtration_order_comp> Column;
 
-// Take a dim-simplex as input and assemble to coboundary matrix column
-// corresponding to that simplex. Return the pivot element of that column
 index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
                                                const index_diameter_t simplex,
                                                const index_t dim,
@@ -18,8 +15,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
                                                entry_hash_map& pivot_column_index) {
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
-	bool check_for_emergent_pair = true;
-	// TODO: Find a more efficient solution to this annoying problem
+	bool check_for_emergent_pair = false;
 	std::vector<index_diameter_t> working_coboundary_buffer;
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
@@ -29,9 +25,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			// Emergent pair candidate check
 			if(check_for_emergent_pair &&
 			   (get_diameter(simplex) == get_diameter(cofacet))) {
-				// Check if the candidate is viable, if not then we certainly
-				// do not have an emergent pair
-				// TODO: Why is the check for the apparent facet necessary?
+				// Apparent pair check
 				if((pivot_column_index.find(get_index(cofacet)) ==
 				    pivot_column_index.end()) &&
 				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
@@ -70,11 +64,11 @@ void assemble_columns_to_reduce(ripser &ripser,
 				if(pivot_column_index.find(get_index(cofacet)) ==
 				   pivot_column_index.end()) {
 					// Apparent Pair check
-					if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
+					//if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
 						columns_to_reduce.push_back(cofacet);
-					} else {
-						info.apparent_count++;
-					}
+					//} else {
+					//	info.apparent_count++;
+					//}
 				} else {
 					cleared_columns.push_back(cofacet);
 					info.clearing_count++;
@@ -130,19 +124,19 @@ void compute_pairs(ripser &ripser,
 				pivot = get_pivot(working_coboundary);
 				add_count++;
 			} else {
-				index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
-				if(get_index(e) != -1) {
-					add_simplex_coboundary(ripser,
-					                       e,
-					                       dim,
-					                       working_reduction_column,
-					                       working_coboundary);
-					pivot = get_pivot(working_coboundary);
-					app_count++;
-				} else {
+				//index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
+				//if(get_index(e) != -1) {
+					//add_simplex_coboundary(ripser,
+					//                       e,
+					//                       dim,
+					//                       working_reduction_column,
+					//                       working_coboundary);
+					//pivot = get_pivot(working_coboundary);
+					//app_count++;
+				//} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
-				}
+				//}
 			}
 		}
 		// Write V_j to V
@@ -156,7 +150,9 @@ void compute_pairs(ripser &ripser,
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			// Non-essential index
-			ripser.add_hom_class(dim, column_to_reduce, pivot);
+			//if(get_diameter(pivot) > get_diameter(column_to_reduce) * ripser.config.ratio) {
+				ripser.add_hom_class(dim, column_to_reduce, pivot);
+			//}
 		} else {
 			// Essential index (since clearing)
 			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF));
@@ -193,7 +189,7 @@ void compute_reps(ripser& ripser,
 	              entry_hash_map& pcidm1,
 	              index_t dim) {
 	time_point rep_start = get_time();
-	std::vector<homology_class>& hom_classes = ripser.barcodes.at(dim).hom_classes;
+	std::vector<homology_class>& hom_classes = ripser.hom_classes.at(dim);
 	std::vector<index_t> active_hom_classes;
 	std::vector<index_t> hom_parities(hom_classes.size(), 0);
 	std::vector<index_t> hom_offs(hom_classes.size(), 0);
@@ -328,14 +324,11 @@ void compute_barcodes(ripser& ripser) {
 	entry_hash_map pcidm1;
 	compressed_sparse_matrix Vdm1;
 	compressed_sparse_matrix Vd;
-	for(index_t i = 0; i < ripser.n; i++) {
-		value_t diam = ripser.compute_diameter(i, 0);
-		simplices.push_back(index_diameter_t(i, diam));
-	}
+	assemble_all_simplices(ripser, simplices, 0);
+	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
 	ripser.infos.at(0).simplex_total_count = simplices.size();
 	ripser.infos.at(0).simplex_reduction_count = simplices.size();
-	index_t last_dim = std::min(ripser.dim_threshold, ripser.dim_max);
-	for(index_t dim = 0; dim <= last_dim; ++dim) {
+	for(index_t dim = 0; dim <= ripser.config.dim_max; dim++) {
 		if(dim == 0) {
 			columns_to_reduce = std::vector<index_diameter_t>(simplices);
 		} else {
@@ -355,6 +348,9 @@ void compute_barcodes(ripser& ripser) {
 		              pivot_column_index,
 		              Vd,
 		              dim);
+		if(columns_to_reduce.size() == 0) {
+			continue;
+		}
 		compute_reps(ripser,
 		             ctrdm1,
 		             columns_to_reduce,
@@ -381,37 +377,20 @@ void compute_barcodes(ripser& ripser) {
  * *************************************************************************/
 
 int main(int argc, char** argv) {
-    std::string filename = "";
+	ripser_config config;
 	if(argc == 2) {
-		filename = argv[1];
+		config = read_config(argv[1]);
 	} else {
-		std::cerr << "error: specify path to lower-distance matrix file as only arg"
-				  << std::endl;
+		std::cerr << "error: missing config path" << std::endl;
 		exit(-1);
 	}
-	// Reading the distance matrix from file
-	std::ifstream file_stream(filename);
-	if (filename != "" && file_stream.fail()) {
-		std::cerr << "error: couldn't open file " << filename << std::endl;
-		exit(-1);
-	}
-	DistanceMatrix dist = read_distance_matrix(file_stream);
-	value_t enclosing_radius = compute_enclosing_radius(dist);
-	index_t dim_max = 2;
-	index_t dim_threshold = 1;
-	float ratio = 1;
-	ripser ripser(std::move(dist), dim_max, dim_threshold, enclosing_radius, ratio);
-	//list_all_simplices(ripser);
+	ripser ripser(config);
+	std::cout << std::endl;
+	output_config(ripser, std::cout); std::cout << std::endl;
+	output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
-	print_barcodes(ripser); std::cout << "\n\n";
-	print_infos(ripser);
-	bool output_cycles = true;
-	if(output_cycles) {
-		std::string fn_pre = "./output/cycle_rep_dim1/";
-		std::string fn = filename.substr(filename.find_last_of("/") + 1);
-		fn = fn.substr(0, fn.find_last_of("."));
-		std::string fn_post = "_cohom_inv_forward.txt";
-		write_dim1_cycles(ripser, fn_pre + fn + fn_post);
-	}
+	output_barcode(ripser, std::cout, true); std::cout << std::endl;
+	output_info(ripser, std::cout); std::cout << std::endl;
+	//write_standard_output(ripser, false, true);
 	exit(0);
 }

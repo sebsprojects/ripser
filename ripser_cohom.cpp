@@ -6,38 +6,42 @@
 
 typedef std::priority_queue<index_diameter_t,
                             std::vector<index_diameter_t>,
-                            filtration_order_comp> Column;
+                            reverse_filtration_order_comp> Column;
 
-index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
-                                             const index_diameter_t simplex,
-                                             const index_t dim,
-                                             Column& working_boundary) {
-	if(dim == 0) {
+index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
+                                               const index_diameter_t simplex,
+                                               const index_t dim,
+                                               Column& working_coboundary) {
+	if(dim == ripser.n - 1) {
 		return index_diameter_t(-1, -1);
 	}
-	simplex_boundary_enumerator facets(ripser);
-	facets.set_simplex(simplex, dim);
-	while(facets.has_next()) {
-		index_diameter_t facet = facets.next();
-		working_boundary.push(facet);
+	simplex_coboundary_enumerator cofacets(ripser);
+	cofacets.set_simplex(simplex, dim);
+	while(cofacets.has_next()) {
+		index_diameter_t cofacet = cofacets.next();
+		working_coboundary.push(cofacet);
 	}
-	return get_pivot(working_boundary);
+	return get_pivot(working_coboundary);
 }
 
 void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& simplices,
                                 const index_t dim) {
 	std::vector<index_diameter_t> next_simplices;
-	simplex_coboundary_enumerator cofacets(ripser);
+	simplex_boundary_enumerator facets(ripser);
 	for(index_diameter_t& simplex : simplices) {
-		cofacets.set_simplex(simplex, dim - 1);
-		while(cofacets.has_next(false)) {
-			index_diameter_t cofacet = cofacets.next();
-			next_simplices.push_back(cofacet);
+		facets.set_simplex(simplex, dim + 1);
+		while(facets.has_next()) {
+			index_diameter_t facet = facets.next();
+			if(std::find(next_simplices.begin(), next_simplices.end(), facet) ==
+			   next_simplices.end())
+			{
+				next_simplices.push_back(facet);
+			}
 		}
 	}
 	simplices.swap(next_simplices);
-	std::sort(simplices.begin(), simplices.end(), filtration_order);
+	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
 	if(dim <= ripser.config.dim_max) {
 		ripser.infos.at(dim).simplex_total_count = simplices.size();
 		ripser.infos.at(dim).simplex_reduction_count = simplices.size();
@@ -49,9 +53,9 @@ void update_hom_class(ripser& ripser,
                       index_diameter_t birth,
                       index_diameter_t death,
                       std::vector<index_diameter_t> R_rep) {
-	for(homology_class& h : ripser.hom_classes.at(dim - 1)) {
+	for(homology_class& h : ripser.hom_classes.at(dim + 1)) {
 		if(get_index(h.birth) == get_index(birth)) {
-			std::cout << "d=" << dim - 1 << " :: ";
+			std::cout << "d=" << dim + 1 << " :: ";
 			for(auto s : h.representative) {
 				std::cout << get_index(s) << " ";
 			}
@@ -76,22 +80,22 @@ void compute_pairs(ripser &ripser,
 		Column R_j;
 		Column V_j;
 		index_diameter_t sigma_j = columns_to_reduce.at(j);
-		index_diameter_t pivot = init_boundary_and_get_pivot(ripser,
-		                                                     sigma_j,
-		                                                     dim,
-		                                                     R_j);
+		index_diameter_t pivot = init_coboundary_and_get_pivot(ripser,
+		                                                       sigma_j,
+		                                                       dim,
+		                                                       R_j);
 		// The reduction
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
 				size_t index_column_to_add = pair->second;
-				add_boundary(ripser,
-				             V,
-				             columns_to_reduce,
-				             index_column_to_add,
-				             dim,
-				             V_j,
-				             R_j);
+				add_coboundary(ripser,
+				               V,
+				               columns_to_reduce,
+				               index_column_to_add,
+				               dim,
+				               V_j,
+				               R_j);
 				pivot = get_pivot(R_j);
 			} else {
 				pivot_column_index.insert({get_index(pivot), j});
@@ -129,12 +133,12 @@ void compute_pairs(ripser &ripser,
 
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
-	assemble_all_simplices(ripser, simplices, 0);
-	std::sort(simplices.begin(), simplices.end(), filtration_order);
-	ripser.infos.at(0).simplex_total_count = ripser.n;
-	ripser.infos.at(0).simplex_reduction_count = ripser.n;
-	for(index_t dim = 0; dim <= ripser.config.dim_max + 1; dim++) {
-		if(dim > 0) {
+	assemble_all_simplices(ripser, simplices, ripser.config.dim_max);
+	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
+	ripser.infos.at(ripser.config.dim_max).simplex_total_count = simplices.size();
+	ripser.infos.at(ripser.config.dim_max).simplex_reduction_count = simplices.size();
+	for(index_t dim = ripser.config.dim_max; dim >= 0; dim--) {
+		if(dim < ripser.config.dim_max) {
 			assemble_columns_to_reduce(ripser, simplices, dim);
 		}
 		compute_pairs(ripser, simplices, dim);
@@ -161,7 +165,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, true);
+	//write_standard_output(ripser, false, true);
 	exit(0);
 }
 

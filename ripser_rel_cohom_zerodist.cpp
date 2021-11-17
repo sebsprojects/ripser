@@ -19,7 +19,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
                                                entry_hash_map& pivot_column_index) {
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
-	bool check_for_emergent_pair = true;
+	bool check_for_emergent_pair = false;
 	// TODO: Find a more efficient solution to this annoying problem
 	std::vector<index_diameter_t> working_coboundary_buffer;
 	while(cofacets.has_next()) {
@@ -43,10 +43,10 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			}
 		}
 	}
-	//for(index_diameter_t cofacet : working_coboundary_buffer) {
-	//	working_coboundary.push(cofacet);
+	for(index_diameter_t cofacet : working_coboundary_buffer) {
+		working_coboundary.push(cofacet);
 	//	print_simplex(ripser, cofacet, dim + 1); std::cout << std::endl;
-	//}
+	}
 	return get_pivot(working_coboundary);
 }
 
@@ -90,17 +90,17 @@ void assemble_columns_to_reduce(ripser &ripser,
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(),
               reverse_filtration_order);
 	// TODO: Is this sort necessary?
-	//std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
-	//if(dim == 1) {
-	//	index_t nonzerocount = 0;
-	//	for(auto s : columns_to_reduce) {
-	//		//print_simplex(ripser, s, dim); std::cout << std::endl;
-	//		if(get_diameter(s) > 0) {
-	//			nonzerocount++;
-	//		}
-	//	}
-	//	std::cout << "NONZEROCOUNT: " << nonzerocount << std::endl;
-	//}
+	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
+	if(dim == 1) {
+		index_t nonzerocount = 0;
+		for(auto s : columns_to_reduce) {
+			std::cout << simplex_tos(ripser, s, dim) << std::endl;
+			if(get_diameter(s) > 0) {
+				nonzerocount++;
+			}
+		}
+		std::cout << "NONZEROCOUNT: " << nonzerocount << std::endl;
+	}
 	info.assemble_dur = get_duration(assemble_start, get_time());
 	info.simplex_reduction_count = columns_to_reduce.size();
 }
@@ -142,21 +142,21 @@ void compute_pairs(ripser &ripser,
 				pivot = get_pivot(working_coboundary);
 				add_count++;
 			} else {
-				index_diameter_t e = get_zero_apparent_facet(ripser,
-				                                             pivot,
-				                                             dim + 1);
-				if(get_index(e) != -1) {
-					add_simplex_coboundary(ripser,
-					                       e,
-					                       dim,
-					                       working_reduction_column,
-					                       working_coboundary);
-					pivot = get_pivot(working_coboundary);
-					app_count++;
-				} else {
+				//index_diameter_t e = get_zero_apparent_facet(ripser,
+				//                                             pivot,
+				//                                             dim + 1);
+				//if(get_index(e) != -1) {
+				//	add_simplex_coboundary(ripser,
+				//	                       e,
+				//	                       dim,
+				//	                       working_reduction_column,
+				//	                       working_coboundary);
+				//	pivot = get_pivot(working_coboundary);
+				//	app_count++;
+				//} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
-				}
+				//}
 			}
 		}
 		// Write V_j to V
@@ -190,75 +190,6 @@ void compute_pairs(ripser &ripser,
 	info.reduction_dur = get_duration(reduction_start, get_time());
 }
 
-void compute_dim0_pairs(ripser& ripser,
-                        std::vector<index_diameter_t>& edges,
-                        std::vector<index_diameter_t>& columns_to_reduce)
-{
-	time_point unionfind_start = get_time();
-	union_find dset(ripser.n);
-	edges = get_edges(ripser);
-	std::sort(edges.begin(), edges.end(), filtration_order);
-	std::vector<index_t> vertices_of_edge(2);
-	// Pre-link the whole relative part
-	index_t first_rel_vertex = ripser.get_first_relative_vertex();
-	if(first_rel_vertex != -1) {
-		for(index_t j = 0; j < ripser.n; j++) {
-			if(ripser.is_relative_vertex(j) && j != first_rel_vertex) {
-				dset.link(first_rel_vertex, j);
-			}
-		}
-	}
-	for(index_t j = 0; j < (index_t) edges.size(); j++) {
-		index_diameter_t e = edges[j];
-		//ripser.add_reduction_record(0, j, get_time());
-		ripser.get_simplex_vertices(get_index(e), 1, ripser.n, vertices_of_edge);
-		index_t u = dset.find(vertices_of_edge[0]);
-		index_t v = dset.find(vertices_of_edge[1]);
-		bool is_relative_edge = ripser.is_relative_vertex(vertices_of_edge[0]) &&
-		                        ripser.is_relative_vertex(vertices_of_edge[1]);
-		if(!is_relative_edge) {
-			if(ripser.config.dim_max > 0) {
-				ripser.infos.at(1).simplex_total_count++;
-			}
-			if(u != v) {
-				// Zero-persistence check
-				if(get_diameter(e) != 0) {
-					//TODO: Dummy index
-					ripser.add_hom_class(0, index_diameter_t(-1, -INF), e);
-					if(ripser.config.dim_max > 0) {
-						ripser.infos.at(1).clearing_count++;
-					}
-				}
-				dset.link(u, v);
-			//} else if(!is_in_zero_apparent_pair(ripser, e, 1)) {
-			//TODO: Why does this cause and error if dim_amax=0
-			} else if(ripser.config.dim_max > 0 &&
-			          get_index(get_zero_apparent_cofacet(ripser, e, 1)) == -1) {
-				columns_to_reduce.push_back(e);
-			} else {
-				if(ripser.config.dim_max > 0) {
-					ripser.infos.at(1).apparent_count++;
-				}
-			}
-		}
-		//ripser.complete_reduction_record(0, get_time(), 0, 0, 0);
-	}
-	// We need the columns_to_reduce in reverse_filtration_order for the
-	// reduction algorithm
-	if(ripser.config.dim_max > 0) {
-		ripser.infos.at(1).simplex_reduction_count = columns_to_reduce.size();
-	}
-	std::reverse(columns_to_reduce.begin(), columns_to_reduce.end());
-	for(index_t i = 0; i < ripser.n; ++i) {
-		// Essential index
-		if(dset.find(i) == i) {
-			// TODO: Dummy index
-			ripser.add_hom_class(0, index_diameter_t(-1, -INF), index_diameter_t(-1, INF));
-		}
-	}
-	ripser.infos.at(0).reduction_dur = get_duration(unionfind_start, get_time());
-}
-
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
 	std::vector<index_diameter_t> columns_to_reduce;
@@ -276,12 +207,6 @@ void compute_barcodes(ripser& ripser) {
 	ripser.infos.at(0).simplex_total_count = columns_to_reduce.size();
 	ripser.infos.at(0).simplex_reduction_count = columns_to_reduce.size();
 	for(index_t dim = 0; dim <= ripser.config.dim_max; ++dim) {
-		if(dim == 0 && ripser.config.use_union_find) {
-			simplices.clear();
-			columns_to_reduce.clear();
-			compute_dim0_pairs(ripser, simplices, columns_to_reduce);
-			continue;
-		}
 		pivot_column_index.clear();
 		pivot_column_index.reserve(columns_to_reduce.size());
 		compute_pairs(ripser,
@@ -313,10 +238,10 @@ int main(int argc, char** argv) {
 	}
 	ripser ripser(config);
 	output_config(ripser, std::cout); std::cout << std::endl;
-	output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
+	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, false);
+	//write_standard_output(ripser, false, true);
 	exit(0);
 }

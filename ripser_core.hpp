@@ -477,7 +477,7 @@ struct ripser {
 
 	mutable ripser_config config;
 	mutable value_t threshold;
-	mutable std::vector<homology_class> hom_classes;
+	mutable std::vector<std::vector<homology_class>> hom_classes;
 	mutable std::vector<info> infos;
 
 	ripser(ripser_config _config)
@@ -499,6 +499,7 @@ struct ripser {
 		}
 		for(index_t i = 0; i <= config.dim_max; ++i) {
 			infos.push_back(info(i));
+			hom_classes.push_back(std::vector<homology_class>());
 		}
 		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
 			if(config.relative_subcomplex.at(i).second == -1) {
@@ -598,7 +599,7 @@ struct ripser {
 	}
 
 	void add_hom_class(index_t dim, index_diameter_t birth, index_diameter_t death, std::vector<index_diameter_t> rep = std::vector<index_diameter_t>()) {
-		hom_classes.push_back(homology_class(dim, birth, death, rep));
+		hom_classes.at(dim).push_back(homology_class(dim, birth, death, rep));
 	}
 
 	void add_reduction_record(index_t dim, index_t j, time_point start) {
@@ -764,6 +765,32 @@ public:
 		return index_diameter_t(cofacet_index, cofacet_diameter);
 	}
 };
+
+void assemble_all_simplices(ripser& ripser,
+                            std::vector<index_diameter_t>& simplices,
+                            index_t dim)
+{
+	simplices.clear();
+	if(dim < ripser.n) {
+		std::vector<index_diameter_t> next_simplices;
+		for(index_t i = 0; i < ripser.n; i++) {
+			value_t diam = ripser.compute_diameter(i, 0);
+			simplices.push_back(index_diameter_t(i, diam));
+		}
+		for(index_t i = 1; i <= dim; i++) {
+			simplex_coboundary_enumerator cofacets(ripser);
+			for(index_diameter_t& simplex : simplices) {
+				cofacets.set_simplex(simplex, i - 1);
+				while(cofacets.has_next(false)) {
+					index_diameter_t cofacet = cofacets.next();
+					next_simplices.push_back(cofacet);
+				}
+			}
+			simplices.swap(next_simplices);
+			next_simplices.clear();
+		}
+	}
+}
 
 
 /* **************************************************************************

@@ -133,11 +133,11 @@ points = read_dataset()
 
 print(simplices)
 
-num_w = 7
-num_h = 5
+num_w = 5
+num_h = 3
 fig, axs = plt.subplots(num_h, num_w, figsize=(figw, figw * 0.9))
 plot_filtration(axs.flat, simplices, points)
 
 
-plt.savefig("../thesis/img/test2.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("filt.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()
