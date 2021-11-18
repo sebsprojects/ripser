@@ -150,9 +150,9 @@ void compute_pairs(ripser &ripser,
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			// Non-essential index
-			//if(get_diameter(pivot) > get_diameter(column_to_reduce) * ripser.config.ratio) {
+			if(get_diameter(pivot) > get_diameter(column_to_reduce) * ripser.config.ratio) {
 				ripser.add_hom_class(dim, column_to_reduce, pivot);
-			//}
+			}
 		} else {
 			// Essential index (since clearing)
 			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF));

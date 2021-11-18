@@ -6,8 +6,14 @@ ripser_rel_cohom_zerodist: ripser_rel_cohom_zerodist.cpp
 ripser_hom: ripser_hom.cpp
 	c++ -std=c++11 -Wall ripser_hom.cpp -o ripser_hom -g
 
+ripser_hom_clearing: ripser_hom_clearing.cpp
+	c++ -std=c++11 -Wall ripser_hom_clearing.cpp -o ripser_hom_clearing -g
+
 ripser_cohom: ripser_cohom.cpp
 	c++ -std=c++11 -Wall ripser_cohom.cpp -o ripser_cohom -g
+
+ripser_cohom_clearing: ripser_cohom_clearing.cpp
+	c++ -std=c++11 -Wall ripser_cohom_clearing.cpp -o ripser_cohom_clearing -g
 
 ripser_hrep_hom_ref: ripser_hrep_hom_ref.cpp
 	c++ -std=c++11 -Wall ripser_hrep_hom_ref.cpp -o ripser_hrep_hom_ref -g

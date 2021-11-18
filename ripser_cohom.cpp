@@ -19,7 +19,9 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 	cofacets.set_simplex(simplex, dim);
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
-		working_coboundary.push(cofacet);
+		if(get_diameter(cofacet) <= ripser.threshold) {
+			working_coboundary.push(cofacet);
+		}
 	}
 	return get_pivot(working_coboundary);
 }
@@ -33,10 +35,14 @@ void assemble_columns_to_reduce(ripser &ripser,
 		facets.set_simplex(simplex, dim + 1);
 		while(facets.has_next()) {
 			index_diameter_t facet = facets.next();
-			if(std::find(next_simplices.begin(), next_simplices.end(), facet) ==
-			   next_simplices.end())
-			{
-				next_simplices.push_back(facet);
+			// Threshold check
+			if(get_diameter(facet) <= ripser.threshold) {
+				//TODO: Uniquness check
+				if(std::find(next_simplices.begin(), next_simplices.end(), facet) ==
+				   next_simplices.end())
+				{
+					next_simplices.push_back(facet);
+				}
 			}
 		}
 	}
@@ -53,18 +59,25 @@ void update_hom_class(ripser& ripser,
                       index_diameter_t birth,
                       index_diameter_t death,
                       std::vector<index_diameter_t> R_rep) {
-	for(homology_class& h : ripser.hom_classes.at(dim + 1)) {
+	std::vector<homology_class>& hc = ripser.hom_classes.at(dim + 1);
+	for(index_t i = 0; i < (index_t) hc.size(); i++) {
+		homology_class& h = hc.at(i);
 		if(get_index(h.birth) == get_index(birth)) {
-			std::cout << "d=" << dim + 1 << " :: ";
-			for(auto s : h.representative) {
-				std::cout << get_index(s) << " ";
+			if(get_diameter(birth) >
+			   std::max(0.0f, get_diameter(death)) * ripser.config.ratio) {
+				std::cout << "d=" << dim + 1 << " :: ";
+				for(auto s : h.representative) {
+					std::cout << get_index(s) << " ";
+				}
+				std::cout << "vs ";
+				for(auto s : R_rep) {
+					std::cout << get_index(s) << " ";
+				}
+				std::cout << std::endl;
+				h.death = death;
+			} else {
+				hc.erase(hc.begin() + i);
 			}
-			std::cout << "vs ";
-			for(auto s : R_rep) {
-				std::cout << get_index(s) << " ";
-			}
-			std::cout << std::endl;
-			h.death = death;
 			break;
 		}
 	}
@@ -119,10 +132,10 @@ void compute_pairs(ripser &ripser,
 		}
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
-			// Non-essential death index (birth in dimension dim - 1)
-			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
+			if(dim < ripser.config.dim_max) {
+				update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
+			}
 		} else {
-			// Zero column
 			if(dim <= ripser.config.dim_max) {
 				ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
 				ripser.infos.at(dim).class_count++;
@@ -133,10 +146,11 @@ void compute_pairs(ripser &ripser,
 
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
-	assemble_all_simplices(ripser, simplices, ripser.config.dim_max);
+	index_t dim_max = std::min(ripser.config.dim_max, ripser.n - 1);
+	assemble_all_simplices(ripser, simplices, dim_max);
 	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
-	ripser.infos.at(ripser.config.dim_max).simplex_total_count = simplices.size();
-	ripser.infos.at(ripser.config.dim_max).simplex_reduction_count = simplices.size();
+	ripser.infos.at(dim_max).simplex_total_count = simplices.size();
+	ripser.infos.at(dim_max).simplex_reduction_count = simplices.size();
 	for(index_t dim = ripser.config.dim_max; dim >= 0; dim--) {
 		if(dim < ripser.config.dim_max) {
 			assemble_columns_to_reduce(ripser, simplices, dim);
@@ -161,7 +175,7 @@ int main(int argc, char** argv) {
 	ripser ripser(config);
 	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
-	output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
+	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;

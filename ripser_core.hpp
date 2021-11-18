@@ -783,7 +783,9 @@ void assemble_all_simplices(ripser& ripser,
 				cofacets.set_simplex(simplex, i - 1);
 				while(cofacets.has_next(false)) {
 					index_diameter_t cofacet = cofacets.next();
-					next_simplices.push_back(cofacet);
+					if(get_diameter(cofacet) <= ripser.threshold) {
+						next_simplices.push_back(cofacet);
+					}
 				}
 			}
 			simplices.swap(next_simplices);
