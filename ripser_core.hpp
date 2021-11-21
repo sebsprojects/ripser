@@ -419,6 +419,7 @@ struct info {
 	size_t simplex_total_count;
 	size_t simplex_reduction_count;
 	size_t class_count;
+	size_t addition_count;
 	
 	duration assemble_dur;
 	duration reduction_dur;
@@ -429,6 +430,7 @@ struct info {
 	info(index_t _dim)
 		: dim(_dim), clearing_count(0), emergent_count(0), apparent_count(0),
 		  simplex_total_count(0), simplex_reduction_count(0), class_count(0),
+		  addition_count(0),
 		  assemble_dur(), reduction_dur(), representative_dur()
 	{ }
 };
@@ -497,7 +499,7 @@ struct ripser {
 		} else {
 			threshold = config.config_threshold;
 		}
-		for(index_t i = 0; i <= config.dim_max; ++i) {
+		for(index_t i = 0; i <= config.dim_max + 1; ++i) {
 			infos.push_back(info(i));
 			hom_classes.push_back(std::vector<homology_class>());
 		}

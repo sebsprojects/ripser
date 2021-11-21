@@ -35,6 +35,7 @@ void assemble_columns_to_reduce(ripser &ripser,
 		cofacets.set_simplex(simplex, dim - 1);
 		while(cofacets.has_next(false)) {
 			index_diameter_t cofacet = cofacets.next();
+			// Threshold check
 			if(get_diameter(cofacet) <= ripser.threshold) {
 				next_simplices.push_back(cofacet);
 			}
@@ -42,10 +43,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 	}
 	simplices.swap(next_simplices);
 	std::sort(simplices.begin(), simplices.end(), filtration_order);
-	if(dim <= ripser.config.dim_max) {
-		ripser.infos.at(dim).simplex_total_count = simplices.size();
-		ripser.infos.at(dim).simplex_reduction_count = simplices.size();
-	}
+	ripser.infos.at(dim).simplex_total_count = simplices.size();
+	ripser.infos.at(dim).simplex_reduction_count = simplices.size();
 }
 
 void update_hom_class(ripser& ripser,
@@ -57,6 +56,7 @@ void update_hom_class(ripser& ripser,
 	for(index_t i = 0; i < (index_t) hc.size(); i++) {
 		homology_class& h = hc.at(i);
 		if(get_index(h.birth) == get_index(birth)) {
+			// dim(death) > dim(birth), need -inf workaround for birth
 			if(get_diameter(death) >
 			   std::max(0.0f, get_diameter(birth)) * ripser.config.ratio) {
 				std::cout << "d=" << dim - 1 << " :: ";
@@ -104,6 +104,7 @@ void compute_pairs(ripser &ripser,
 				             V_j,
 				             R_j);
 				pivot = get_pivot(R_j);
+				ripser.infos.at(dim).addition_count++;
 			} else {
 				pivot_column_index.insert({get_index(pivot), j});
 				break;
@@ -111,7 +112,6 @@ void compute_pairs(ripser &ripser,
 		}
 		// Write V_j to V
 		std::vector<index_diameter_t> V_rep;
-		std::vector<index_diameter_t> R_rep;
 		V_rep.push_back(sigma_j);
 		index_diameter_t e = pop_pivot(V_j);
 		while(get_index(e) != -1) {
@@ -119,19 +119,18 @@ void compute_pairs(ripser &ripser,
 			V_rep.push_back(e);
 			e = pop_pivot(V_j);
 		}
-		e = pop_pivot(R_j);
-		while(get_index(e) != -1) {
-			R_rep.push_back(e);
-			e = pop_pivot(R_j);
-		}
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
+			std::vector<index_diameter_t> R_rep;
+			e = pop_pivot(R_j);
+			while(get_index(e) != -1) {
+				R_rep.push_back(e);
+				e = pop_pivot(R_j);
+			}
 			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
 		} else {
-			if(dim <= ripser.config.dim_max) {
-				ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
-				ripser.infos.at(dim).class_count++;
-			}
+			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
+			ripser.infos.at(dim).class_count++;
 		}
 	}
 }
@@ -142,7 +141,7 @@ void compute_barcodes(ripser& ripser) {
 	std::sort(simplices.begin(), simplices.end(), filtration_order);
 	ripser.infos.at(0).simplex_total_count = ripser.n;
 	ripser.infos.at(0).simplex_reduction_count = ripser.n;
-	index_t dim_max = std::min(ripser.config.dim_max + 1, ripser.n - 1);
+	index_t dim_max = std::min(ripser.config.dim_max, ripser.n - 1);
 	for(index_t dim = 0; dim <= dim_max; dim++) {
 		if(dim > 0) {
 			assemble_columns_to_reduce(ripser, simplices, dim);
@@ -171,7 +170,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, true);
+	write_standard_output(ripser, true, true);
 	exit(0);
 }
 

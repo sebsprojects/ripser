@@ -9,7 +9,8 @@ std::string simplex_tos(ripser& ripser,
                         index_t dim,
                         bool include_index=true,
                         bool include_simplices=true,
-                        bool include_diameter=true)
+                        bool include_diameter=true,
+                        bool include_rel=false)
 {
 	std::stringstream ss;
 	if(include_index) {
@@ -35,12 +36,39 @@ std::string simplex_tos(ripser& ripser,
 		ss << std::fixed << std::setprecision(3)
 		   << get_diameter(simplex);
 	}
+	if(include_rel) {
+		if(ripser.is_relative_simplex(get_index(simplex), dim)) {
+			ss << "-r";
+		}
+	}
 	return ss.str();
 }
 
-void output_simplices(ripser& ripser, std::ostream& os,
-                      total_simplex_order ord=total_reverse_filtration_order,
-                      bool pref=false)
+void output_barcode_simplices(ripser& ripser, std::ostream& os,
+                              total_simplex_order ord=total_filtration_order,
+                              bool pref=false)
+{
+	std::vector<std::pair<index_t, index_diameter_t>> all_simplices;
+	for(auto& hc : ripser.hom_classes) {
+		for(auto& h : hc) {
+			all_simplices.push_back(std::make_pair(h.dim, h.birth));
+			if(get_index(h.death) != -1) {
+				all_simplices.push_back(std::make_pair(h.dim + 1, h.death));
+			}
+		}
+	}
+	std::sort(all_simplices.begin(), all_simplices.end(), ord);
+	for(auto &s : all_simplices) {
+		std::string p = pref ? ("#s" + std::to_string(s.first) + "  ") : "";
+		os << p
+		   << simplex_tos(ripser, s.second, s.first, true, true, true, true)
+		   << std::endl;
+	}
+}
+
+void output_all_simplices(ripser& ripser, std::ostream& os,
+                          total_simplex_order ord=total_filtration_order,
+                          bool pref=false)
 {
 	std::vector<index_diameter_t> simpl_prev;
 	std::vector<index_diameter_t> simpl_curr;
@@ -65,16 +93,16 @@ void output_simplices(ripser& ripser, std::ostream& os,
 	}
 	std::sort(all_simplices.begin(), all_simplices.end(), ord);
 	for(auto &s : all_simplices) {
-		std::string p = pref ? ("#s" + std::to_string(s.first) + " ") : "";
-		os << p << "  "
-		   << simplex_tos(ripser, s.second, s.first, true, true, true)
+		std::string p = pref ? ("#s" + std::to_string(s.first) + "  ") : "";
+		os << p
+		   << simplex_tos(ripser, s.second, s.first, true, true, true, true)
 		   << std::endl;
 	}
 }
 
-void output_simplices_by_dim(ripser& ripser, std::ostream& os,
-                             simplex_order ord=reverse_filtration_order,
-                             index_t dim=-1, bool pref=false)
+void output_all_simplices_by_dim(ripser& ripser, std::ostream& os,
+                                 simplex_order ord=filtration_order,
+                                 index_t dim=-1, bool pref=false)
 {
 	std::vector<index_diameter_t> simpl_prev;
 	std::vector<index_diameter_t> simpl_curr;
@@ -111,7 +139,7 @@ void output_simplices_by_dim(ripser& ripser, std::ostream& os,
 
 void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, index_t dim=-1, bool pref=false)
 {
-	for(index_t d = 0; d < (index_t) ripser.hom_classes.size(); d++) {
+	for(index_t d = 0; d <= (index_t) ripser.config.dim_max + 1; d++) {
 		if(!(dim == -1 || d == dim)) {
 			continue;
 		}
@@ -128,14 +156,15 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 			} else {
 				os << "," << death << ")";
 			}
-			os << " - [" << get_index(hc.birth);
+			os << " ; [" << simplex_tos(ripser, hc.birth, d, 1, 1, 0, 0);
 			if(death == INF) {
 				os << ", )";
 			} else {
-				os << "," << get_index(hc.death) << ")";
+				os << "," << simplex_tos(ripser, hc.death, d + 1, 1, 1, 0, 0)
+				   << ")";
 			}
 			if(with_reps) {
-				os << " - ";
+				os << " ; ";
 				for(index_diameter_t& simp : hc.representative) {
 					os << simplex_tos(ripser, simp, d, false, true, false);
 					if(simp != hc.representative.back()) {
@@ -146,14 +175,14 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 			os << std::endl;
 		}
 		if(d + 1 < (index_t) ripser.hom_classes.size()) {
-			std::cout << std::endl;
+			os << std::endl;
 		}
 	}
 }
 
 void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=false)
 {
-	for(auto info : ripser.infos) {
+	for(info& info : ripser.infos) {
 		std::string p = pref ? ("#i" + std::to_string(info.dim) + " ") : "";
 		if(dim == -1 || info.dim == dim) {
 			os << (pref ? "# " : "") << "info in dim=" << info.dim << ":"
@@ -169,14 +198,16 @@ void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=fal
 			os << p << "  emergent count:          "
 			   << info.emergent_count << std::endl;
 			os << p << "  apparent count:          "
-			  << info.apparent_count << std::endl;
-			os << p <<"  assemble duration:       "
+			   << info.apparent_count << std::endl;
+			os << p << "  addition count:          "
+			   << info.addition_count << std::endl;
+			os << p << "  assemble duration:       "
 			   << info.assemble_dur.count() << "s" << std::endl;
 			os << p << "  reduction duration:      "
 			   << info.reduction_dur.count() << "s" << std::endl;
 			os << p << "  representative duration: "
 			   << info.representative_dur.count() << "s" << std::endl;
-			if(info.dim < ripser.config.dim_max) {
+			if(&info != &ripser.infos.back()) {
 				os << std::endl;
 			}
 		}
@@ -241,12 +272,14 @@ std::ofstream get_writeout_stream(ripser& ripser) {
 	return std::ofstream(filename, std::ofstream::trunc);
 }
 
-void write_standard_output(ripser& ripser, bool with_reps=false, bool with_simplex_list=false) {
+void write_standard_output(ripser& ripser,
+                           bool with_reps=false,
+                           bool with_simplex_list=false,
+                           total_simplex_order ord=total_filtration_order) {
 	std::ofstream ofs = get_writeout_stream(ripser);
 	output_config(ripser, ofs, true); ofs << std::endl;
 	if(with_simplex_list) {
-		// TODO: Should pass in the order
-		output_simplices(ripser, ofs, total_filtration_order, true);
+		output_barcode_simplices(ripser, ofs, ord, true);
 		ofs << std::endl;
 	}
 	output_info(ripser, ofs, -1, true); ofs << std::endl;

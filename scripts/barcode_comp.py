@@ -117,11 +117,13 @@ def plot_barcode(ax, bounds, intervals):
 # MAIN
 # -----------------------------------------------------------------------------
 
-fig, ax = plt.subplots(1, 1, figsize=(figw, figw))
-input_file = sys.argv[1]
+n = len(sys.argv) - 1
+fig, axs = plt.subplots(n, 1, figsize=(figw, figw))
 
-bounds, intervals = read_barcode(input_file)
-plot_barcode(ax, bounds, intervals)
+for i in range(n):
+    input_file = sys.argv[i + 1]
+    bounds, intervals = read_barcode(input_file)
+    plot_barcode((axs if n == 1 else (axs.flat[i])), bounds, intervals)
 #plt.savefig("../thesis/img/test1.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
-plt.savefig("test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("diam_rings100_abs_0-49_0-74.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()

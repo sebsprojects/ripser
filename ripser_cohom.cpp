@@ -48,10 +48,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 	}
 	simplices.swap(next_simplices);
 	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
-	if(dim <= ripser.config.dim_max) {
-		ripser.infos.at(dim).simplex_total_count = simplices.size();
-		ripser.infos.at(dim).simplex_reduction_count = simplices.size();
-	}
+	ripser.infos.at(dim).simplex_total_count = simplices.size();
+	ripser.infos.at(dim).simplex_reduction_count = simplices.size();
 }
 
 void update_hom_class(ripser& ripser,
@@ -59,26 +57,34 @@ void update_hom_class(ripser& ripser,
                       index_diameter_t birth,
                       index_diameter_t death,
                       std::vector<index_diameter_t> R_rep) {
-	std::vector<homology_class>& hc = ripser.hom_classes.at(dim + 1);
-	for(index_t i = 0; i < (index_t) hc.size(); i++) {
-		homology_class& h = hc.at(i);
-		if(get_index(h.birth) == get_index(birth)) {
-			if(get_diameter(birth) >
-			   std::max(0.0f, get_diameter(death)) * ripser.config.ratio) {
-				std::cout << "d=" << dim + 1 << " :: ";
-				for(auto s : h.representative) {
-					std::cout << get_index(s) << " ";
+	if(dim == ripser.config.dim_max) {
+		if(get_diameter(birth) >
+		   std::max(0.0f, get_diameter(death)) * ripser.config.ratio) {
+			ripser.add_hom_class(dim + 1, birth, death, R_rep);
+		}
+	} else {
+		std::vector<homology_class>& hc = ripser.hom_classes.at(dim + 1);
+		for(index_t i = 0; i < (index_t) hc.size(); i++) {
+			homology_class& h = hc.at(i);
+			if(get_index(h.birth) == get_index(birth)) {
+				// dim(birth) > dim(death), need -inf workaround for death
+				if(get_diameter(birth) >
+				   std::max(0.0f, get_diameter(death)) * ripser.config.ratio) {
+					std::cout << "d=" << dim + 1 << " :: ";
+					for(auto s : h.representative) {
+						std::cout << get_index(s) << " ";
+					}
+					std::cout << "vs ";
+					for(auto s : R_rep) {
+						std::cout << get_index(s) << " ";
+					}
+					std::cout << std::endl;
+					h.death = death;
+				} else {
+					hc.erase(hc.begin() + i);
 				}
-				std::cout << "vs ";
-				for(auto s : R_rep) {
-					std::cout << get_index(s) << " ";
-				}
-				std::cout << std::endl;
-				h.death = death;
-			} else {
-				hc.erase(hc.begin() + i);
+				break;
 			}
-			break;
 		}
 	}
 }
@@ -110,6 +116,7 @@ void compute_pairs(ripser &ripser,
 				               V_j,
 				               R_j);
 				pivot = get_pivot(R_j);
+				ripser.infos.at(dim).addition_count++;
 			} else {
 				pivot_column_index.insert({get_index(pivot), j});
 				break;
@@ -117,7 +124,6 @@ void compute_pairs(ripser &ripser,
 		}
 		// Write V_j to V
 		std::vector<index_diameter_t> V_rep;
-		std::vector<index_diameter_t> R_rep;
 		V_rep.push_back(sigma_j);
 		index_diameter_t e = pop_pivot(V_j);
 		while(get_index(e) != -1) {
@@ -125,21 +131,18 @@ void compute_pairs(ripser &ripser,
 			V_rep.push_back(e);
 			e = pop_pivot(V_j);
 		}
-		e = pop_pivot(R_j);
-		while(get_index(e) != -1) {
-			R_rep.push_back(e);
-			e = pop_pivot(R_j);
-		}
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
-			if(dim < ripser.config.dim_max) {
-				update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
+			std::vector<index_diameter_t> R_rep;
+			e = pop_pivot(R_j);
+			while(get_index(e) != -1) {
+				R_rep.push_back(e);
+				e = pop_pivot(R_j);
 			}
+			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
 		} else {
-			if(dim <= ripser.config.dim_max) {
-				ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
-				ripser.infos.at(dim).class_count++;
-			}
+			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
+			ripser.infos.at(dim).class_count++;
 		}
 	}
 }
@@ -151,7 +154,7 @@ void compute_barcodes(ripser& ripser) {
 	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
 	ripser.infos.at(dim_max).simplex_total_count = simplices.size();
 	ripser.infos.at(dim_max).simplex_reduction_count = simplices.size();
-	for(index_t dim = ripser.config.dim_max; dim >= 0; dim--) {
+	for(index_t dim = dim_max; dim >= 0; dim--) {
 		if(dim < ripser.config.dim_max) {
 			assemble_columns_to_reduce(ripser, simplices, dim);
 		}

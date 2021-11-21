@@ -54,10 +54,8 @@ void assemble_columns_to_reduce(ripser &ripser,
 	}
 	simplices.swap(next_simplices);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), reverse_filtration_order);
-	if(dim <= ripser.config.dim_max) {
-		ripser.infos.at(dim).simplex_total_count = simplices.size();
-		ripser.infos.at(dim).simplex_reduction_count = simplices.size();
-	}
+	ripser.infos.at(dim).simplex_total_count = simplices.size();
+	ripser.infos.at(dim).simplex_reduction_count = simplices.size();
 }
 
 void compute_pairs(ripser &ripser,
@@ -86,6 +84,7 @@ void compute_pairs(ripser &ripser,
 				               dim,
 				               V_j,
 				               R_j);
+				ripser.infos.at(dim).addition_count++;
 				pivot = get_pivot(R_j);
 			} else {
 				pivot_column_index.insert({get_index(pivot), j});
@@ -102,24 +101,20 @@ void compute_pairs(ripser &ripser,
 			V_rep.push_back(e);
 			e = pop_pivot(V_j);
 		}
-		e = pop_pivot(R_j);
-		while(get_index(e) != -1) {
-			R_rep.push_back(e);
-			e = pop_pivot(R_j);
-		}
 		if(get_index(pivot) != -1) {
-			if(dim < ripser.config.dim_max) {
-				if(get_diameter(pivot) >
-				   std::max(0.0f, get_diameter(sigma_j)) * ripser.config.ratio) {
-					ripser.add_hom_class(dim + 1, pivot, sigma_j, R_rep);
-					ripser.infos.at(dim + 1).class_count++;
+			value_t death = std::max(0.0f, get_diameter(sigma_j));
+			if(get_diameter(pivot) > death * ripser.config.ratio) {
+				e = pop_pivot(R_j);
+				while(get_index(e) != -1) {
+					R_rep.push_back(e);
+					e = pop_pivot(R_j);
 				}
+				ripser.add_hom_class(dim + 1, pivot, sigma_j, R_rep);
+				ripser.infos.at(dim + 1).class_count++;
 			}
 		} else {
-			if(dim <= ripser.config.dim_max) {
-				ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
-				ripser.infos.at(dim).class_count++;
-			}
+			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
+			ripser.infos.at(dim).class_count++;
 		}
 	}
 }
@@ -132,7 +127,7 @@ void compute_barcodes(ripser& ripser) {
 	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
 	ripser.infos.at(0).simplex_total_count = simplices.size();
 	ripser.infos.at(0).simplex_reduction_count = simplices.size();
-	index_t dim_max = std::min(ripser.config.dim_max + 1, ripser.n - 1);
+	index_t dim_max = std::min(ripser.config.dim_max, ripser.n - 1);
 	for(index_t dim = 0; dim <= dim_max; dim++) {
 		if(dim == 0) {
 			columns_to_reduce = simplices;

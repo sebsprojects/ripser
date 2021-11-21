@@ -119,19 +119,13 @@ def plot_barcode(ax, max_bound, intervals):
 # MAIN
 # -----------------------------------------------------------------------------
 
-n = len(sys.argv) - 1
-fig, axs = plt.subplots(n, 1, figsize=(figw, figw))
+fig, ax = plt.subplots(1, 1, figsize=(figw, figw))
+input_file = sys.argv[1]
 
-max_b = 0
-for i in range(n):
-    input_file = sys.argv[i + 1]
-    simplex_lookup = read_simplices(input_file)
-    max_bound, intervals = read_barcode(input_file, simplex_lookup)
-    max_b = max(max_b, max_bound)
-    plot_barcode((axs if n == 1 else (axs.flat[i])), max_bound, intervals)
-for i in range(n):
-    if n > 1:
-        axs.flat[i].set_xlim(1, max_b+1)
+simplex_lookup = read_simplices(input_file)
+max_bound, intervals = read_barcode(input_file, simplex_lookup)
+plot_barcode(ax, max_bound, intervals)
+
 #plt.savefig("../thesis/img/test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
-plt.savefig("index_rings100_abs_0-49_0-74.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
-#plt.show()
+#plt.savefig("index_rings100_abs_0-49_0-74.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)

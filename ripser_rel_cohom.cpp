@@ -296,10 +296,11 @@ int main(int argc, char** argv) {
 	}
 	ripser ripser(config);
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
+	//output_simplices(ripser, std::cout, total_reverse_filtration_order);
+	std::cout << std::endl;
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, false, true);
+	write_standard_output(ripser, false, true, total_filtration_order);
 	exit(0);
 }
