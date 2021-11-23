@@ -193,6 +193,8 @@ void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=fal
 			   << info.simplex_reduction_count << std::endl;
 			os << p << "  class count:             "
 			   << info.class_count << std::endl;
+			os << p << "  zero pers count:         "
+			   << info.zero_pers_count<< std::endl;
 			os << p << "  clearing count:          "
 			   << info.clearing_count << std::endl;
 			os << p << "  emergent count:          "
@@ -218,9 +220,10 @@ void output_config(ripser& ripser, std::ostream& os, bool pref=false) {
 	std::string p = pref ? "#c " : "";
 	ripser_config& config = ripser.config;
 	os << (pref ? "# " : "") << "config" << std::endl;
-	os << p << "  dataset at file path: " << config.file_path << std::endl;
-	os << p << "  output at file path:  " << config.output_path << std::endl;
-	os << p << "  dataset input type:   " << config.input_type << std::endl;
+	os << p << "  input path:           " << config.input_path << std::endl;
+	os << p << "  input type:           " << config.input_type << std::endl;
+	os << p << "  output path:          " << config.output_path << std::endl;
+	os << p << "  dataset vertex count: " << ripser.n << std::endl;
 	os << p << "  dim max:              " << config.dim_max << std::endl;
 	os << p << "  ratio:                " << config.ratio << std::endl;
 	os << p << "  threshold:            " << ripser.threshold;
@@ -233,43 +236,86 @@ void output_config(ripser& ripser, std::ostream& os, bool pref=false) {
 	}
 	os << p << "  use union find:       "
 	   << config.use_union_find << std::endl;
-	os << p << "  relative:             ";
+	os << p << "  absolute vertices:    ";
+	if(config.absolute_subcomplex.size() == 0) {
+		os << "0-" << ripser.n - 1 << " (all)";
+	} else {
+		auto pair = config.absolute_subcomplex.at(0);
+		os << pair.first << "-" << pair.second;
+		if(pair.first == 0 && pair.second == ripser.n - 1) {
+			os << " (all)";
+		} else {
+			for(index_t i = 1; i < (index_t) config.absolute_subcomplex.size(); i++) {
+				pair = config.absolute_subcomplex.at(i);
+				os << "," << pair.first << "-" << pair.second;
+			}
+		}
+	}
+	os << std::endl;
+	os << p << "  relative vertices:    ";
 	if(config.relative_subcomplex.size() == 0) {
 		os << "(empty)";
 	} else {
-		auto pair = config.relative_subcomplex.at(0);
+		auto pair = config.config_relative_subcomplex.at(0);
+		os << pair.first << "-" << pair.second;
+		for(index_t i = 1; i < (index_t) config.config_relative_subcomplex.size(); i++) {
+			pair = config.config_relative_subcomplex.at(i);
+			os << "," << pair.first << "-" << pair.second;
+		}
+		os << " (is ";
+		pair = config.relative_subcomplex.at(0);
 		os << pair.first << "-" << pair.second;
 		for(index_t i = 1; i < (index_t) config.relative_subcomplex.size(); i++) {
 			pair = config.relative_subcomplex.at(i);
 			os << "," << pair.first << "-" << pair.second;
 		}
+		os << ")" << std::endl;
 	}
 	os << std::endl;
 }
 
 std::ofstream get_writeout_stream(ripser& ripser) {
-	std::string ip = ripser.config.file_path;
+	std::string ip = ripser.config.input_path;
 	std::string dataset_name = ip.substr(ip.find_last_of("/\\") + 1);
-	std::string rel_name = "rel";
-	for(index_t i = 0; i < (index_t) ripser.config.relative_subcomplex.size(); i++) {
-		rel_name += std::to_string(ripser.config.relative_subcomplex.at(i).first);
-		rel_name += "-" + std::to_string(ripser.config.relative_subcomplex.at(i).second);
-		if(i < (index_t) ripser.config.relative_subcomplex.size() - 1) {
-			rel_name += "x";
+	std::stringstream ss;
+	ss << ripser.config.output_path << "/";
+	ss << dataset_name.substr(0, dataset_name.find_last_of(".")) << "_";
+	ss << "d" << ripser.config.dim_max;
+	if(ripser.config.config_threshold < 0) {
+		ss << "tM";
+	} else {
+		std::string ts = std::to_string(ripser.config.config_threshold);
+		ts = ts.erase(ts.find_last_not_of('0') + 1, std::string::npos);
+		std::replace(ts.begin(), ts.end(), '.', 'f');
+		ss << "t" << ts;
+	}
+	std::string cs = std::to_string(ripser.config.ratio);
+	cs = cs.erase(cs.find_last_not_of('0') + 1, std::string::npos);
+	std::replace(cs.begin(), cs.end(), '.', 'f');
+	ss << "r" << cs;
+	ss << "u" << ripser.config.use_enclosing_threshold
+	   << ripser.config.use_union_find;
+	if(!ripser.config.absolute_subcomplex.empty()) {
+		ss << "_abs";
+		for(auto& iint : ripser.config.absolute_subcomplex) {
+			ss << iint.first << "-" << iint.second;
+			if(&iint != &ripser.config.absolute_subcomplex.back()) {
+				ss << "x";
+			}
 		}
 	}
-	if(ripser.config.relative_subcomplex.empty()) {
-		rel_name = "relnone";
+	if(!ripser.config.config_relative_subcomplex.empty()) {
+		ss << "_rel";
+		for(auto& iint : ripser.config.config_relative_subcomplex) {
+			ss << iint.first << "-" << iint.second;
+			if(&iint != &ripser.config.config_relative_subcomplex.back()) {
+				ss << "x";
+			}
+		}
 	}
-	std::string thresh_name = "thresh" + std::to_string(ripser.threshold);
-	thresh_name.erase(thresh_name.find_last_not_of('0') + 1, std::string::npos);
-	std::replace(thresh_name.begin(), thresh_name.end(), '.', 'd');
-	std::string filename = ripser.config.output_path + "/"
-		+ dataset_name
-		+ "_" + thresh_name + "_"
-		+ rel_name
-		+ ".txt";
-	return std::ofstream(filename, std::ofstream::trunc);
+	ss << ".txt";
+	std::cout << ss.str() << std::endl;
+	return std::ofstream(ss.str(), std::ofstream::trunc);
 }
 
 void write_standard_output(ripser& ripser,

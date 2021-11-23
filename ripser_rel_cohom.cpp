@@ -163,10 +163,14 @@ void compute_pairs(ripser &ripser,
 			value_t birth = get_diameter(column_to_reduce);
 			value_t death = get_diameter(pivot);
 			if(death > birth * ripser.config.ratio) {
+				ripser.infos.at(dim).class_count++;
 				ripser.add_hom_class(dim, column_to_reduce, pivot);
+			} else {
+				ripser.infos.at(dim).zero_pers_count++;
 			}
 		} else {
 			// Essential index (since clearing)
+			ripser.infos.at(dim).class_count++;
 			ripser.add_hom_class(dim, column_to_reduce, index_diameter_t(-1, INF));
 		}
 	}
@@ -301,6 +305,6 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, true, total_filtration_order);
+	write_standard_output(ripser, false, false, total_filtration_order);
 	exit(0);
 }

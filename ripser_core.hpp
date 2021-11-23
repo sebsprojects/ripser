@@ -1,6 +1,8 @@
 #ifndef RIPSER_CORE
 #define RIPSER_CORE
 
+#include "ripser_config.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -230,23 +232,35 @@ struct compressed_sparse_matrix {
  * Matrix Read-In
  * *************************************************************************/
 
-compressed_lower_distance_matrix read_lower_distance_matrix(std::istream& input_stream) {
-	std::vector<value_t> distances;
-	value_t value;
-	while (input_stream >> value) {
-		distances.push_back(value);
-		input_stream.ignore();
+bool is_absolute_index(ripser_config& config, index_t idx) {
+	if(config.absolute_subcomplex.empty()) {
+		return true;
 	}
-	return compressed_lower_distance_matrix(std::move(distances));
+	for(index_t i = 0; i < (index_t) config.absolute_subcomplex.size(); i++) {
+		auto pair = config.absolute_subcomplex.at(i);
+		if(idx >= pair.first && idx <= pair.second) {
+			return true;
+		}
+	}
+	return false;
 }
 
-compressed_lower_distance_matrix read_full_distance_matrix(std::istream& input_stream) {
+compressed_lower_distance_matrix read_distance_matrix(ripser_config& config,
+                                                      std::istream& input_stream)
+{
 	std::vector<value_t> distances;
 	std::string line;
 	value_t value;
 	for(int i = 0; std::getline(input_stream, line); ++i) {
+		if(!is_absolute_index(config, i)) {
+			continue;
+		}
 		std::istringstream s(line);
-		for (int j = 0; j < i && s >> value; ++j) {
+		for (int j = 0; j < i; ++j) {
+			s >> value;
+			if(!is_absolute_index(config, j)) {
+				continue;
+			}
 			distances.push_back(value);
 			s.ignore();
 		}
@@ -254,11 +268,16 @@ compressed_lower_distance_matrix read_full_distance_matrix(std::istream& input_s
 	return compressed_lower_distance_matrix(std::move(distances));
 }
 
-std::vector<std::vector<value_t>> read_point_cloud(std::istream& input_stream) {
+std::vector<std::vector<value_t>> read_point_cloud(ripser_config& config,
+                                                   std::istream& input_stream)
+{
 	std::vector<std::vector<value_t>> points;
 	std::string line;
 	value_t value;
-	while (std::getline(input_stream, line)) {
+	for(int i = 0; std::getline(input_stream, line); ++i) {
+		if(!is_absolute_index(config, i)) {
+			continue;
+		}
 		std::vector<value_t> point;
 		std::istringstream s(line);
 		while (s >> value) {
@@ -279,7 +298,8 @@ struct diff_squared {
 	}
 };
 
-std::vector<value_t> point_cloud_to_distance_vector(std::vector<std::vector<value_t>>& points) {
+std::vector<value_t> point_cloud_to_distance_vector(std::vector<std::vector<value_t>>& points)
+{
 	std::vector<value_t> distances;
 	for(size_t i = 0; i < points.size(); i++) {
 		for(size_t j = 0; j < i; j++) {
@@ -295,22 +315,25 @@ std::vector<value_t> point_cloud_to_distance_vector(std::vector<std::vector<valu
 	return distances;
 }
 
-compressed_lower_distance_matrix read_input(std::string filepath, std::string input_type) {
-	std::ifstream file_stream(filepath);
+compressed_lower_distance_matrix read_input(ripser_config config) {
+	std::ifstream file_stream(config.input_path);
 	if(!file_stream) {
-		std::cerr << "error: couldn't open matrix file: " << filepath << std::endl;
+		std::cerr << "error: couldn't open matrix file: " << config.input_path
+		          << std::endl;
 		exit(-1);
 	}
-	if(input_type == "lower_distance_matrix") {
-		return read_lower_distance_matrix(file_stream);
-	} else if(input_type == "full_distance_matrix") {
-		return read_full_distance_matrix(file_stream);
-	} else if(input_type == "point_cloud") {
-		std::vector<std::vector<value_t>> points = read_point_cloud(file_stream);
-		std::vector<value_t> distances = point_cloud_to_distance_vector(points);
+	if(config.input_type == "lower_distance_matrix" ||
+	   config.input_type == "full_distance_matrix") {
+		return read_distance_matrix(config, file_stream);
+	} else if(config.input_type == "point_cloud") {
+		std::vector<std::vector<value_t>> points =
+			read_point_cloud(config, file_stream);
+		std::vector<value_t> distances =
+			point_cloud_to_distance_vector(points);
 		return compressed_lower_distance_matrix(std::move(distances));
 	} else {
-		std::cerr << "error: invalid matrix type: " << input_type << std::endl;
+		std::cerr << "error: invalid matrix type: " << config.input_type
+		          << std::endl;
 		exit(-1);
 	}
 }
@@ -419,6 +442,7 @@ struct info {
 	size_t simplex_total_count;
 	size_t simplex_reduction_count;
 	size_t class_count;
+	size_t zero_pers_count;
 	size_t addition_count;
 	
 	duration assemble_dur;
@@ -430,7 +454,7 @@ struct info {
 	info(index_t _dim)
 		: dim(_dim), clearing_count(0), emergent_count(0), apparent_count(0),
 		  simplex_total_count(0), simplex_reduction_count(0), class_count(0),
-		  addition_count(0),
+		  zero_pers_count(0), addition_count(0),
 		  assemble_dur(), reduction_dur(), representative_dur()
 	{ }
 };
@@ -443,37 +467,9 @@ duration get_duration(time_point start, time_point end) {
 	return end - start;
 }
 
-struct ripser_config {
-	std::string file_path;
-	std::string output_path;
-	std::string input_type;
-	index_t dim_max;
-	value_t ratio;
-	value_t config_threshold;
-	bool use_enclosing_threshold;
-	bool use_union_find;
-	bool use_zero_dist_rel;
-	bool print_progress;
-	std::vector<std::pair<index_t, index_t>> relative_subcomplex;
-
-	ripser_config()
-		: file_path(""),
-		  output_path(""),
-		  input_type("lower_distance_matrix"),
-		  dim_max(2),
-		  ratio(1.0),
-		  config_threshold(-1.0),
-		  use_enclosing_threshold(false),
-		  use_union_find(false),
-		  use_zero_dist_rel(false),
-		  print_progress(false),
-		  relative_subcomplex()
-  { }
-};
-
 struct ripser {
 
-	mutable DistanceMatrix dist;
+	const DistanceMatrix dist;
 	const index_t n;
 	const binomial_coeff_table binomial_coeff;
 
@@ -483,7 +479,7 @@ struct ripser {
 	mutable std::vector<info> infos;
 
 	ripser(ripser_config _config)
-		: dist(read_input(_config.file_path, _config.input_type)),
+		: dist(read_input(_config)),
 		  n(dist.size()),
 		  binomial_coeff(n, _config.dim_max + 2),
 		  config(_config),
@@ -503,20 +499,12 @@ struct ripser {
 			infos.push_back(info(i));
 			hom_classes.push_back(std::vector<homology_class>());
 		}
-		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
-			if(config.relative_subcomplex.at(i).second == -1) {
-				config.relative_subcomplex.at(i).second = n - 1;
-			}
-		}
-		if(config.use_zero_dist_rel) {
-			set_relative_zero_distance();
-			config.relative_subcomplex.clear();
-		}
 	}
 	
 	// For a k-simplex idx, return the vertex (of idx) of maximal index
 	// n is an upper bound for the search
-	index_t get_max_vertex(const index_t idx, const index_t k, const index_t n) const {
+	index_t get_max_vertex(const index_t idx, const index_t k, const index_t n) const
+	{
 		index_t top = n;
 		index_t bot = k - 1;
 		// Find max{ i | binomial_coeff(i,k) <= idx } via binary search
@@ -547,16 +535,6 @@ struct ripser {
 			idx -= binomial_coeff(n, k);
 		}
 	}
-	
-	void set_relative_zero_distance() {
-		for(index_t i = 0; i < n; i++) {
-			for(index_t j = i + 1; j < n; j++) {
-				if(is_relative_vertex(i) && is_relative_vertex(j)) {
-					dist.set_entry(i, j, 0);
-				}
-			}
-		}
-	}
 
 	index_t get_first_relative_vertex() const {
 		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
@@ -565,6 +543,9 @@ struct ripser {
 		return -1;
 	}
 
+	// TODO: Might be problematic if filtration order instead of
+	// reverse_filt_order since indices in relative_subcomplex no
+	// longer correspond to vertex indices
 	bool is_relative_vertex(index_t idx) const {
 		for(index_t i = 0; i < (index_t) config.relative_subcomplex.size(); i++) {
 			auto pair = config.relative_subcomplex.at(i);
@@ -574,7 +555,7 @@ struct ripser {
 		}
 		return false;
 	}
-	
+
 	bool is_relative_simplex(index_t idx, const index_t dim) const {
 		index_t n = this->n - 1;
 		for(index_t k = dim + 1; k > 0; --k) {
@@ -615,7 +596,7 @@ struct ripser {
 		//TODO(seb): hacky hacky hacky output handling
 		static index_t thresh_counter = -1;
 		static index_t curr_dim = -1;
-		static index_t thresh_lim = 0;
+		static index_t thresh_lim = 10;
 		static index_t thresh_linelim = 50;
 		reduction_record& rec = infos.at(dim).red_records.back();
 		rec.end = end;
@@ -770,12 +751,16 @@ public:
 
 void assemble_all_simplices(ripser& ripser,
                             std::vector<index_diameter_t>& simplices,
-                            index_t dim)
+                            index_t dim,
+                            bool respect_relative=true)
 {
 	simplices.clear();
 	if(dim < ripser.n) {
 		std::vector<index_diameter_t> next_simplices;
 		for(index_t i = 0; i < ripser.n; i++) {
+			if(respect_relative && ripser.is_relative_vertex(i)) {
+				continue;
+			}
 			value_t diam = ripser.compute_diameter(i, 0);
 			simplices.push_back(index_diameter_t(i, diam));
 		}
@@ -1040,95 +1025,6 @@ bool is_in_zero_apparent_pair(ripser& ripser, index_diameter_t simplex, index_t 
 		return (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1) ||
 		       (get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1);
 	}
-}
-
-
-/* **************************************************************************
- * Config Parsing
- * *************************************************************************/
-
-std::pair<index_t, index_t> parse_interval(std::string tok) {
-	size_t dash_pos = tok.find("-");
-	if(dash_pos == std::string::npos) {
-		return std::make_pair(std::stoi(tok), std::stoi(tok));
-	} else {
-		index_t start = 0;
-		index_t end = -1;
-		std::string string_start = tok.substr(0, dash_pos);
-		if(!string_start.empty()) {
-			start = std::stoi(string_start);
-		}
-		if(dash_pos + 1 < tok.length()) {
-			std::string string_end = tok.substr(dash_pos + 1, tok.length());
-			if(!string_end.empty()) {
-				end = std::stoi(string_end);
-			}
-		}
-		return std::make_pair(start,end);
-	}
-}
-
-ripser_config read_config(char* configpath) {
-	std::ifstream file_stream(configpath);
-	if(file_stream.fail()) {
-		std::cerr << "error: couldn't open config file " << configpath << std::endl;
-		exit(-1);
-	}
-	ripser_config config;
-	std::string line;
-	while(getline(file_stream, line)) {
-		line.erase(std::remove_if(line.begin(), line.end(), isspace), line.end());
-		if(line.empty() || line[0] == '#' || line[0] == ';' || line[0] == '[') {
-		  continue;
-		}
-		size_t delim_pos = line.find("=");
-		std::string name = line.substr(0, delim_pos);
-		std::string string_value = line.substr(delim_pos + 1);
-		if(name == "file_path") {
-			config.file_path = string_value;
-		}
-		if(name == "output_path") {
-			config.output_path = string_value;
-		}
-		if(name == "input_type") {
-			config.input_type = string_value;
-		}
-		if(name == "dim_max") {
-			config.dim_max = std::stoi(string_value);
-		}
-		if(name == "ratio") {
-			config.ratio = std::stod(string_value);
-		}
-		if(name == "use_enclosing_threshold") {
-			config.use_enclosing_threshold = (string_value == "true") || (string_value == "1");
-		}
-		if(name == "use_union_find") {
-			config.use_union_find = (string_value == "true" || (string_value == "1"));
-		}
-		if(name == "use_zero_dist_rel") {
-			config.use_zero_dist_rel = (string_value == "true" || (string_value == "1"));
-		}
-		if(name == "threshold") {
-			config.config_threshold = std::stod(string_value);
-		}
-		if(name == "print_progress") {
-			config.print_progress = (string_value == "true") || (string_value == "1");
-		}
-		if(name == "relative_subcomplex") {
-			if(string_value.empty()) {
-				continue;
-			}
-			size_t comma_pos = 0;
-			std::string tok;
-			while((comma_pos = string_value.find(",")) != std::string::npos) {
-				tok = string_value.substr(0, comma_pos);
-				config.relative_subcomplex.push_back(parse_interval(tok));
-				string_value.erase(0, comma_pos + 1);
-			}
-			config.relative_subcomplex.push_back(parse_interval(string_value));
-		}
-	}
-	return config;
 }
 
 #endif

@@ -28,8 +28,8 @@ PI = math.pi
 tex_fonts = {
     "text.usetex": True,
     "font.family": "serif",
-    "axes.labelsize": 11,
-    "font.size": 11,
+    "axes.labelsize": 9,
+    "font.size": 9,
     "legend.fontsize": 9,
     "xtick.labelsize": 9,
     "ytick.labelsize": 9,
@@ -60,7 +60,9 @@ def diam_comp_bar(a, b):
 def parse_simplex(s, dim, simplex_lookup, rel):
     toks = s.split("-")
     index = int(toks[0].strip())
-    filt_index = simplex_lookup.index([dim, index])
+    filt_index = []
+    if len(simplex_lookup) > 0:
+        filt_index = simplex_lookup.index([dim, index])
     if len(toks) > 1:
         vertices = [int(t) for t in toks[1].split("'")]
         is_rel = 1
@@ -94,7 +96,7 @@ def parse_bar(line, simplex_lookup=[], rel=[]):
     return [dim, diams, indices, filt_indices, is_rel]
 
 
-def read_barcode(input_file, simplex_lookup, rel):
+def read_barcode(input_file, simplex_lookup = [], rel = []):
     f = open(input_file, "r");
     intervals = []
     max_diam = 0
@@ -111,11 +113,11 @@ def read_barcode(input_file, simplex_lookup, rel):
                 continue
             max_diam = max(max_diam, bar[1][0])
             max_index = max(max_index, bar[2][0])
-            max_findex = max(max_index, bar[3][0])
+            #max_findex = max(max_index, bar[3][0])
             if len(bar[1]) > 1:
                 max_diam = max(max_diam, bar[1][1])
                 max_index = max(max_index, bar[2][1])
-                max_findex = max(max_findex, bar[3][1])
+                # max_findex = max(max_findex, bar[3][1])
             if len(bars) - 1 < dim:
                 bars.append([])
             bars[dim].append(bar)
@@ -139,17 +141,6 @@ def read_rel(input_file):
             iend = int(s.split("-")[1])
             return range(istart,iend + 1)
 
-#TODO: Same here
-def read_abs(input_file):
-    f = open(input_file, "r")
-    for line in f:
-        if line.find("absolute") != -1:
-            s = line.split(":")[1].strip()
-            istart = int(s.split("-")[0])
-            iend = int(s.split("-")[1])
-            return range(istart,iend + 1)
-
-
 #TODO: Adjust for absolute_subcomplex that does not start at 0
 def read_simplices(input_file):
     f = open(input_file, "r")
@@ -161,8 +152,8 @@ def read_simplices(input_file):
             simplex_lookup.append([dim, index])
     return simplex_lookup
 
-def plot_barcode(ax, max_bound, bars, xbars = []):
-    h_inc = max_bound * 0.01
+def plot_barcode(ax, max_bound, bars, xbars1 = [], xbars2 = []):
+    h_inc = 1
     h_skip = h_inc * 1.5
     h = 0
     ax.set_xlim(1, max_bound+1)
@@ -174,16 +165,27 @@ def plot_barcode(ax, max_bound, bars, xbars = []):
     for dim, bc in enumerate(bars):
         if dim == 0:
             continue
-        h += h_skip
+        h += h_skip * 3
+        eps = max_bound * 0.01
         for bar in bc:
-            c = colors[dim]
-            for xbar in xbars[dim]:
-                if bar[2] == xbar[2]:
-                    c = "tab:gray"
-                    break
-                elif bar[2][0] == xbar[2][0]:
-                    c = "tab:brown"
-                    break
+            c = "tab:blue"
+            if xbars1 != []:
+                for xbar in xbars1[dim]:
+                    if bar[1] == xbar[1]:
+                        c = "tab:blue"
+                        break
+                    #elif (abs(bar[1][0] - xbar[1][0]) < eps) and (abs(bar[1][1] - xbar[1][1]) < eps):
+                    elif bar[1][0] == xbar[1][0] and abs(bar[1][1] - xbar[1][1]) < eps:
+                        c = "tab:blue"
+                        break
+            if xbars2 != []:
+                for xbar in xbars2[dim]:
+                    if bar[1] == xbar[1]:
+                        c = "tab:orange"
+                        break
+                    elif bar[1][0] == xbar[1][0] and abs(bar[1][1] - xbar[1][1]) < eps:
+                        c = "tab:orange"
+                        break
             ax.plot(bar[1], [h, h], color=c, linewidth=0.5)
             if bar != bc[-1]:
                 h += h_inc
@@ -194,22 +196,27 @@ def plot_barcode(ax, max_bound, bars, xbars = []):
 # MAIN
 # -----------------------------------------------------------------------------
 
-fig, axs = plt.subplots(2, 1, figsize=(figw, 2 * figw))
-abs_file = sys.argv[1]
-rel_file = sys.argv[2]
+fig, axs = plt.subplots(3, 1, figsize=(figw, 2 * figw))
+big_file = sys.argv[1]
+small_file = sys.argv[2]
+rel_file = sys.argv[3]
 
-rel = read_rel(rel_file)
-abs_lookup = read_simplices(abs_file)
-rel_lookup = read_simplices(rel_file)
-abs_bounds, abs_bars = read_barcode(abs_file, abs_lookup, rel)
-rel_bounds, rel_bars = read_barcode(rel_file, rel_lookup, rel)
+big_bounds, big_bars = read_barcode(big_file)
+small_bounds, small_bars = read_barcode(small_file)
+rel_bounds, rel_bars = read_barcode(rel_file)
 
-plot_barcode(axs.flat[0], abs_bounds[0], abs_bars, rel_bars)
-plot_barcode(axs.flat[1], rel_bounds[0], rel_bars, abs_bars)
+plot_barcode(axs.flat[0], big_bounds[0], small_bars, [], [])
+plot_barcode(axs.flat[1], big_bounds[0], big_bars, [], [])
+plot_barcode(axs.flat[2], rel_bounds[0], rel_bars, [])
 
-max_b = max(abs_bounds[0], rel_bounds[0])
+max_b = max(big_bounds[0], small_bounds[0])
+max_b = max(max_b, rel_bounds[0])
 axs.flat[0].set_xlim(0, max_b)
+axs.flat[0].set_title(r'\texttt{abs [0,4999]}')
 axs.flat[1].set_xlim(0, max_b)
+axs.flat[1].set_title(r'\texttt{abs [0,2499]}')
+axs.flat[2].set_xlim(0, max_b)
+axs.flat[2].set_title(r'\texttt{abs [0,4999] rel [0,2499]}')
 
-plt.savefig("test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("visu/covid_landdistmat_1.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()
