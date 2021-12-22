@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib import collections as mc
 from matplotlib import colors as mcol
 from matplotlib.lines import Line2D
+import mpl_toolkits.mplot3d as a3
 import numpy as np
 import math
 import sys
@@ -39,27 +40,14 @@ plt.rcParams.update(tex_fonts)
 # -----------------------------------------------------------------------------
 
 def read_dataset():
-    f = open(input_file, "r")
+    d = open(input_file, "r")
     points = []
-    for line in f:
-        if line.find("input path") != -1:
-            path = line.split(":")[1].strip()
-            d = open(path, "r")
-            for l in d:
-                if l.strip() == "":
-                    continue
-                else:
-                    points.append([float(p.strip()) for p in l.split(",")])
+    for l in d:
+        if l.strip() == "":
+            continue
+        else:
+            points.append([float(p.strip()) for p in l.split(",")])
     return points
-
-def read_simplices():
-    f = open(input_file, "r")
-    simplices = []
-    for line in f:
-        if line.startswith("#s"):
-            vertices = [int(v) for v in line[3:].split("-")[1].strip().split("'")]
-            simplices.append(vertices)
-    return simplices
 
 def get_limits(points):
     x_lim = [points[0][0], points[0][0]]
@@ -76,34 +64,13 @@ def get_limits(points):
     offs = 0.65 * max(x_len, y_len)
     return [x_mid - offs, x_mid + offs], [y_mid - offs, y_mid + offs]
 
-def init_ax(ax, xlim, ylim, i):
+def init_ax(ax, xlim, ylim, s):
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title(r'$K_{' + str(i) + "}$", pad=5)
-
-def plot_filtration(axs, simplices, points):
-    xlim, ylim = get_limits(points)
-    for i in range(len(simplices)):
-        init_ax(axs[i], xlim, ylim, i + 1)
-        for j in range(i + 1):
-            dim = len(simplices[j])
-            c = colors[1] if i == j else colors[0]
-            if dim == 1:
-                plot_point(axs[i], points[simplices[j][0]], c)
-            elif dim == 2:
-                ps = [points[simplices[j][k]] for k in range(2)]
-                plot_line(axs[i], ps, c)
-            else:
-                for m in range(dim):
-                    a = m
-                    b = m + 3
-                    ps = [points[simplices[j][k % dim]] for k in range(a,b)]
-                    c = colors[1] if i == j else "lightskyblue"
-                    plot_trig(axs[i], ps, c)
-
+    ax.set_title(r'' + s, pad=5)
 
 def plot_point(ax, p, c):
     ax.plot([p[0]], [p[1]], "o", color=c, zorder=3, markersize=5)
@@ -120,37 +87,72 @@ def plot_trig(ax, ps, c):
 # MAIN
 # -----------------------------------------------------------------------------
 
-docw = 418.25372 / 72
+input_file = sys.argv[1]
+points = read_dataset()
+xlim, ylim = get_limits(points)
 
+docw = 418.25372 / 72
 subw = docw * 0.14
 marginw = docw * 0.02
 marginh = docw * 0.043
 
 num_w = 5
-num_h = 3
+num_h = 1
 
 figw = (subw + marginw) * num_w + marginw
 figh = (subw + marginh) * num_h + marginw
-
 fig = mplfig.Figure(figsize=(figw, figh))
-
 print(figw / docw)
-
+title_list = ["$X$", "$L$", "$K$", "$\\mathrm{Rips}_6(X)$", "$|\\mathrm{Rips}_6(X)|$"]
 axs = []
 for j in range(num_h):
     y = figh - marginh - subw - j * (subw + marginh)
     for i in range(num_w):
         x = marginw + i * (subw + marginw)
         ax = fig.add_axes([x / figw, y / figh, subw / figw, subw / figh])
+        init_ax(ax, xlim, ylim, title_list[i])
         axs.append(ax)
 
-input_file = sys.argv[1]
+for p in points:
+    for i in range(num_w - 1):
+        plot_point(axs[i], p, colors[0])
 
-simplices = read_simplices()
-points = read_dataset()
+plot_line(axs[1], [points[0], points[2]], colors[0])
+plot_line(axs[1], [points[1], points[2]], colors[0])
+plot_line(axs[1], [points[0], points[1]], colors[0])
+plot_line(axs[1], [points[3], points[0]], colors[0])
 
-plot_filtration(axs, simplices, points)
+
+plot_line(axs[2], [points[0], points[2]], colors[0])
+plot_line(axs[2], [points[1], points[2]], colors[0])
+plot_line(axs[2], [points[0], points[1]], colors[0])
+plot_line(axs[2], [points[3], points[0]], colors[0])
+plot_line(axs[2], [points[1], points[3]], colors[0])
+plot_trig(axs[2], [points[0], points[2], points[1]], colors[0])
+
+plot_line(axs[3], [points[0], points[2]], colors[0])
+plot_line(axs[3], [points[1], points[2]], colors[0])
+plot_line(axs[3], [points[0], points[1]], colors[0])
+plot_line(axs[3], [points[3], points[0]], colors[0])
+plot_line(axs[3], [points[1], points[3]], colors[0])
+plot_line(axs[3], [points[2], points[3]], colors[0])
+plot_trig(axs[3], [points[0], points[2], points[1]], colors[0])
+plot_trig(axs[3], [points[1], points[3], points[0]], colors[0])
+
+# 3D PLOT
+ax3 = fig.add_axes([x / figw + 0.01, y / figh - 0.01, subw / figw - 0.02, subw / figh - 0.02], projection="3d")
+ax3.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax3.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax3.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax3.set_axis_off()
+xyz = np.array([[ 0, 1, 0], [ 1, 1, 0], [ 0, 1, 1], [0, 0, 0]])
+tri = np.array([[ 0, 1, 2], [ 0, 1, 3], [ 0, 2, 3], [1, 2, 3]])
+vts = xyz[tri, : ]
+tri = a3.art3d.Poly3DCollection(vts, linewidths=1, edgecolors='tab:blue')
+tri.set_alpha(0.25)
+ax3.scatter3D(xyz[:,0], xyz[:,1], xyz[:,2], depthshade=False, s=15)
+ax3.add_collection3d(tri)
 
 
-fig.savefig("filt.pdf", format='pdf')
-fig.savefig("../thesis/img/00-filt-simplexwise.pdf", format='pdf')
+fig.savefig("complexes.pdf", format='pdf')
+fig.savefig("../thesis/img/00-complexes.pdf", format='pdf')

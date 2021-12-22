@@ -91,6 +91,7 @@ def parse_bar(line, simplex_lookup=[], rel=[]):
         end_simplex = parse_simplex(index_toks[1], dim + 1, simplex_lookup, rel)
         indices.append(end_simplex[0])
         filt_indices.append(end_simplex[1])
+    print(filt_indices)
     return [dim, diams, indices, filt_indices, is_rel]
 
 
@@ -111,7 +112,7 @@ def read_barcode(input_file, simplex_lookup, rel):
                 continue
             max_diam = max(max_diam, bar[1][0])
             max_index = max(max_index, bar[2][0])
-            max_findex = max(max_index, bar[3][0])
+            max_findex = max(max_findex, bar[3][0])
             if len(bar[1]) > 1:
                 max_diam = max(max_diam, bar[1][1])
                 max_index = max(max_index, bar[2][1])
@@ -134,17 +135,7 @@ def read_rel(input_file):
     f = open(input_file, "r")
     for line in f:
         if line.find("relative") != -1:
-            s = line.split(":")[1].strip()
-            istart = int(s.split("-")[0])
-            iend = int(s.split("-")[1])
-            return range(istart,iend + 1)
-
-#TODO: Same here
-def read_abs(input_file):
-    f = open(input_file, "r")
-    for line in f:
-        if line.find("absolute") != -1:
-            s = line.split(":")[1].strip()
+            s = line.split(":")[1].strip().split(" ")[0]
             istart = int(s.split("-")[0])
             iend = int(s.split("-")[1])
             return range(istart,iend + 1)
@@ -172,19 +163,19 @@ def plot_barcode(ax, max_bound, bars, xbars = []):
     ax.spines["left"].set_visible(False)
     ax.spines["right"].set_visible(False)
     for dim, bc in enumerate(bars):
-        if dim == 0:
-            continue
         h += h_skip
+        if dim >= 2:
+            continue
         for bar in bc:
-            c = colors[dim]
+            c = "black"
             for xbar in xbars[dim]:
                 if bar[2] == xbar[2]:
-                    c = "tab:gray"
+                    c = "tab:blue"
                     break
                 elif bar[2][0] == xbar[2][0]:
-                    c = "tab:brown"
+                    c = "tab:orange"
                     break
-            ax.plot(bar[1], [h, h], color=c, linewidth=0.5)
+            ax.plot(bar[3], [h, h], color=c, linewidth=1)
             if bar != bc[-1]:
                 h += h_inc
     h += h_skip
@@ -200,16 +191,17 @@ rel_file = sys.argv[2]
 
 rel = read_rel(rel_file)
 abs_lookup = read_simplices(abs_file)
-rel_lookup = read_simplices(rel_file)
 abs_bounds, abs_bars = read_barcode(abs_file, abs_lookup, rel)
-rel_bounds, rel_bars = read_barcode(rel_file, rel_lookup, rel)
+rel_bounds, rel_bars = read_barcode(rel_file, abs_lookup, rel)
 
-plot_barcode(axs.flat[0], abs_bounds[0], abs_bars, rel_bars)
-plot_barcode(axs.flat[1], rel_bounds[0], rel_bars, abs_bars)
+print(abs_bounds, rel_bounds)
 
-max_b = max(abs_bounds[0], rel_bounds[0])
+plot_barcode(axs.flat[0], abs_bounds[2], abs_bars, rel_bars)
+plot_barcode(axs.flat[1], rel_bounds[2], rel_bars, abs_bars)
+
+max_b = max(abs_bounds[2], rel_bounds[2])
 axs.flat[0].set_xlim(0, max_b)
 axs.flat[1].set_xlim(0, max_b)
 
-plt.savefig("test.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("visu/index_pers_sphere_96.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()

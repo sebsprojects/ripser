@@ -168,7 +168,7 @@ def plot_barcode(ax, max_bound, bars, xbars1 = [], xbars2 = []):
         h += h_skip * 3
         eps = max_bound * 0.01
         for bar in bc:
-            c = "tab:blue"
+            c = "black"
             if xbars1 != []:
                 for xbar in xbars1[dim]:
                     if bar[1] == xbar[1]:
@@ -186,7 +186,7 @@ def plot_barcode(ax, max_bound, bars, xbars1 = [], xbars2 = []):
                     elif bar[1][0] == xbar[1][0] and abs(bar[1][1] - xbar[1][1]) < eps:
                         c = "tab:orange"
                         break
-            ax.plot(bar[1], [h, h], color=c, linewidth=0.5)
+            ax.plot(bar[1], [h, h], color=c, linewidth=1)
             if bar != bc[-1]:
                 h += h_inc
     h += h_skip
@@ -207,16 +207,16 @@ rel_bounds, rel_bars = read_barcode(rel_file)
 
 plot_barcode(axs.flat[0], big_bounds[0], small_bars, [], [])
 plot_barcode(axs.flat[1], big_bounds[0], big_bars, [], [])
-plot_barcode(axs.flat[2], rel_bounds[0], rel_bars, [])
+plot_barcode(axs.flat[2], rel_bounds[0], rel_bars, [], [])
 
 max_b = max(big_bounds[0], small_bounds[0])
 max_b = max(max_b, rel_bounds[0])
 axs.flat[0].set_xlim(0, max_b)
-axs.flat[0].set_title(r'\texttt{abs [0,4999]}')
+axs.flat[0].set_title(r'\texttt{abs [0,249]}')
 axs.flat[1].set_xlim(0, max_b)
-axs.flat[1].set_title(r'\texttt{abs [0,2499]}')
+axs.flat[1].set_title(r'\texttt{abs [0,499]}')
 axs.flat[2].set_xlim(0, max_b)
-axs.flat[2].set_title(r'\texttt{abs [0,4999] rel [0,2499]}')
+axs.flat[2].set_title(r'\texttt{abs [0,499] rel [0,249]}')
 
-plt.savefig("visu/covid_landdistmat_1.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
+plt.savefig("visu/covid_landdistmat_spike_2_dim1.pdf", format='pdf', bbox_inches="tight", pad_inches=0.05)
 #plt.show()

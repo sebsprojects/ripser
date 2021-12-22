@@ -85,9 +85,7 @@ def init_ax(ax, xlim, ylim, i):
     ax.set_title(r'$K_{' + str(i) + "}$", pad=5)
 
 def plot_filtration(axs, simplices, points):
-    xlim, ylim = get_limits(points)
     for i in range(len(simplices)):
-        init_ax(axs[i], xlim, ylim, i + 1)
         for j in range(i + 1):
             dim = len(simplices[j])
             c = colors[1] if i == j else colors[0]
@@ -97,12 +95,7 @@ def plot_filtration(axs, simplices, points):
                 ps = [points[simplices[j][k]] for k in range(2)]
                 plot_line(axs[i], ps, c)
             else:
-                for m in range(dim):
-                    a = m
-                    b = m + 3
-                    ps = [points[simplices[j][k % dim]] for k in range(a,b)]
-                    c = colors[1] if i == j else "lightskyblue"
-                    plot_trig(axs[i], ps, c)
+                continue
 
 
 def plot_point(ax, p, c):
@@ -114,14 +107,21 @@ def plot_line(ax, ps, c):
     ax.add_collection(lc)
 
 def plot_trig(ax, ps, c):
-    trig = plt.Polygon(ps, color=c, alpha=0.4)
+    if c == colors[1]:
+        alpha=0.5
+    else:
+        alpha=0.4
+    trig = plt.Polygon(ps, color=c, alpha=alpha)
     ax.add_patch(trig)
 
 # MAIN
 # -----------------------------------------------------------------------------
 
-docw = 418.25372 / 72
+input_file = sys.argv[1]
+simplices = read_simplices()
+points = read_dataset()
 
+docw = 418.25372 / 72
 subw = docw * 0.14
 marginw = docw * 0.02
 marginh = docw * 0.043
@@ -131,23 +131,31 @@ num_h = 3
 
 figw = (subw + marginw) * num_w + marginw
 figh = (subw + marginh) * num_h + marginw
-
 fig = mplfig.Figure(figsize=(figw, figh))
-
 print(figw / docw)
-
+xlim, ylim = get_limits(points)
 axs = []
 for j in range(num_h):
     y = figh - marginh - subw - j * (subw + marginh)
     for i in range(num_w):
         x = marginw + i * (subw + marginw)
         ax = fig.add_axes([x / figw, y / figh, subw / figw, subw / figh])
+        init_ax(ax, xlim, ylim, j * (num_w) + i + 1)
         axs.append(ax)
 
-input_file = sys.argv[1]
+plot_trig(axs[10], [points[simplices[10][k]] for k in range(3)], colors[1])
 
-simplices = read_simplices()
-points = read_dataset()
+plot_trig(axs[11], [points[simplices[10][k]] for k in range(3)], colors[0])
+plot_trig(axs[11], [points[simplices[11][k]] for k in range(3)], colors[1])
+
+plot_trig(axs[12], [points[simplices[13][k]] for k in range(3)], colors[0])
+plot_trig(axs[12], [points[simplices[12][k]] for k in range(3)], colors[1])
+
+plot_trig(axs[13], [points[simplices[12][k]] for k in range(3)], colors[0])
+plot_trig(axs[13], [points[simplices[13][k]] for k in range(3)], colors[1])
+
+plot_trig(axs[14], [points[simplices[10][k]] for k in range(3)], colors[1])
+plot_trig(axs[14], [points[simplices[11][k]] for k in range(3)], colors[1])
 
 plot_filtration(axs, simplices, points)
 

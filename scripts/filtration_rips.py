@@ -25,11 +25,11 @@ PI = math.pi
 tex_fonts = {
     "text.usetex": True,
     "font.family": "serif",
-    "axes.labelsize": 9,
+#    "axes.labelsize": 9,
     "font.size": 9,
-    "legend.fontsize": 9,
-    "xtick.labelsize": 9,
-    "ytick.labelsize": 9,
+#    "legend.fontsize": 9,
+#    "xtick.labelsize": 9,
+#    "ytick.labelsize": 9,
     'text.latex.preamble': r'\usepackage{amsfonts}'
 }
 plt.rcParams.update(tex_fonts)
@@ -55,11 +55,15 @@ def read_dataset():
 def read_simplices():
     f = open(input_file, "r")
     simplices = []
+    diams = []
     for line in f:
         if line.startswith("#s"):
             vertices = [int(v) for v in line[3:].split("-")[1].strip().split("'")]
-            simplices.append(vertices)
-    return simplices
+            diam = float(line[3:].split("-")[2].strip())
+            if diam not in diams:
+                diams.append(diam)
+            simplices.append([diam, vertices])
+    return diams, simplices
 
 def get_limits(points):
     x_lim = [points[0][0], points[0][0]]
@@ -76,33 +80,29 @@ def get_limits(points):
     offs = 0.65 * max(x_len, y_len)
     return [x_mid - offs, x_mid + offs], [y_mid - offs, y_mid + offs]
 
-def init_ax(ax, xlim, ylim, i):
+def init_ax(ax, xlim, ylim, s):
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title(r'$K_{' + str(i) + "}$", pad=5)
+    ax.set_title(r'$t=' + s + "$", pad=5)
 
-def plot_filtration(axs, simplices, points):
+def plot_filtration(axs, simplices, diams, points, title_list):
     xlim, ylim = get_limits(points)
-    for i in range(len(simplices)):
-        init_ax(axs[i], xlim, ylim, i + 1)
-        for j in range(i + 1):
-            dim = len(simplices[j])
-            c = colors[1] if i == j else colors[0]
+    for i in range(len(diams)):
+        init_ax(axs[i], xlim, ylim, title_list[i])
+        for simp in simplices:
+            if simp[0] > diams[i]:
+                break
+            dim = len(simp[1])
+            diam = simp[0]
+            c = colors[1] if diam == diams[i] else colors[0]
             if dim == 1:
-                plot_point(axs[i], points[simplices[j][0]], c)
+                plot_point(axs[i], points[simp[1][0]], c)
             elif dim == 2:
-                ps = [points[simplices[j][k]] for k in range(2)]
+                ps = [points[simp[1][k]] for k in range(2)]
                 plot_line(axs[i], ps, c)
-            else:
-                for m in range(dim):
-                    a = m
-                    b = m + 3
-                    ps = [points[simplices[j][k % dim]] for k in range(a,b)]
-                    c = colors[1] if i == j else "lightskyblue"
-                    plot_trig(axs[i], ps, c)
 
 
 def plot_point(ax, p, c):
@@ -114,7 +114,7 @@ def plot_line(ax, ps, c):
     ax.add_collection(lc)
 
 def plot_trig(ax, ps, c):
-    trig = plt.Polygon(ps, color=c, alpha=0.4)
+    trig = plt.Polygon(ps, color=c, alpha=0.6)
     ax.add_patch(trig)
 
 # MAIN
@@ -127,7 +127,7 @@ marginw = docw * 0.02
 marginh = docw * 0.043
 
 num_w = 5
-num_h = 3
+num_h = 1
 
 figw = (subw + marginw) * num_w + marginw
 figh = (subw + marginh) * num_h + marginw
@@ -135,6 +135,8 @@ figh = (subw + marginh) * num_h + marginw
 fig = mplfig.Figure(figsize=(figw, figh))
 
 print(figw / docw)
+
+title_list = ["0", "4", "\\sqrt{17}", "\\sqrt{41}", "6"]
 
 axs = []
 for j in range(num_h):
@@ -146,11 +148,18 @@ for j in range(num_h):
 
 input_file = sys.argv[1]
 
-simplices = read_simplices()
+read_dataset()
+diams, simplices = read_simplices()
 points = read_dataset()
 
-plot_filtration(axs, simplices, points)
+print(simplices)
+
+plot_filtration(axs, simplices, diams, points, title_list)
+
+# MANUAL TO AVOID OVERLAPS
+plot_trig(axs[4], [points[0], points[1], points[2]], colors[1])
+plot_trig(axs[4], [points[0], points[1], points[3]], colors[1])
 
 
 fig.savefig("filt.pdf", format='pdf')
-fig.savefig("../thesis/img/00-filt-simplexwise.pdf", format='pdf')
+fig.savefig("../thesis/img/00-filt-rips.pdf", format='pdf')
