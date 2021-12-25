@@ -57,8 +57,10 @@ def read_simplices():
     simplices = []
     for line in f:
         if line.startswith("#s"):
+            dim = int(line[2])
+            index = int(line[3:].split("-")[0].strip())
             vertices = [int(v) for v in line[3:].split("-")[1].strip().split("'")]
-            simplices.append(vertices)
+            simplices.append([dim, index, vertices])
     return simplices
 
 def get_limits(points):
@@ -87,13 +89,12 @@ def init_ax(ax, xlim, ylim, i):
 def plot_filtration(axs, simplices, points):
     for i in range(len(simplices)):
         for j in range(i + 1):
-            dim = len(simplices[j])
+            dim = simplices[j][0]
             c = colors[1] if i == j else colors[0]
-            if dim == 1:
-                plot_point(axs[i], points[simplices[j][0]], c)
-            elif dim == 2:
-                ps = [points[simplices[j][k]] for k in range(2)]
-                plot_line(axs[i], ps, c)
+            if dim == 0:
+                plot_point(axs[i], points[simplices[j][2][0]], c)
+            elif dim == 1:
+                plot_line(axs[i], [points[simplices[j][2][k]] for k in range(dim+1)], c)
             else:
                 continue
 
@@ -121,6 +122,8 @@ input_file = sys.argv[1]
 simplices = read_simplices()
 points = read_dataset()
 
+print(simplices)
+
 docw = 418.25372 / 72
 subw = docw * 0.14
 marginw = docw * 0.02
@@ -143,22 +146,22 @@ for j in range(num_h):
         init_ax(ax, xlim, ylim, j * (num_w) + i + 1)
         axs.append(ax)
 
-plot_trig(axs[10], [points[simplices[10][k]] for k in range(3)], colors[1])
+plot_trig(axs[10], [points[simplices[10][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[11], [points[simplices[10][k]] for k in range(3)], colors[0])
-plot_trig(axs[11], [points[simplices[11][k]] for k in range(3)], colors[1])
+plot_trig(axs[11], [points[simplices[10][2][k]] for k in range(3)], colors[0])
+plot_trig(axs[11], [points[simplices[11][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[12], [points[simplices[13][k]] for k in range(3)], colors[0])
-plot_trig(axs[12], [points[simplices[12][k]] for k in range(3)], colors[1])
+plot_trig(axs[12], [points[simplices[13][2][k]] for k in range(3)], colors[0])
+plot_trig(axs[12], [points[simplices[12][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[13], [points[simplices[12][k]] for k in range(3)], colors[0])
-plot_trig(axs[13], [points[simplices[13][k]] for k in range(3)], colors[1])
+plot_trig(axs[13], [points[simplices[12][2][k]] for k in range(3)], colors[0])
+plot_trig(axs[13], [points[simplices[13][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[14], [points[simplices[10][k]] for k in range(3)], colors[1])
-plot_trig(axs[14], [points[simplices[11][k]] for k in range(3)], colors[1])
+plot_trig(axs[14], [points[simplices[10][2][k]] for k in range(3)], colors[1])
+plot_trig(axs[14], [points[simplices[11][2][k]] for k in range(3)], colors[1])
 
 plot_filtration(axs, simplices, points)
 
 
 fig.savefig("filt.pdf", format='pdf')
-fig.savefig("../thesis/img/00-filt-simplexwise.pdf", format='pdf')
+#fig.savefig("../thesis/img/00-filt-simplexwise.pdf", format='pdf')

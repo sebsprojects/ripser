@@ -49,71 +49,40 @@ def comp_bar(a, b):
     else:
         return 1
 
-def read_barcode(input_file, simplex_lookup):
+def read_barcode(input_file):
     f = open(input_file, "r");
     intervals = []
     max_bound = 0
-    offs = 1
+    bounds = []
     for line in f:
         if line.startswith("#b"):
             dim = int(line[2])
             if dim + 1 > len(intervals):
                 intervals.append([dim,[]])
             toks = [t.strip() for t in line[3:].split(";")]
-            sint = toks[1].replace("[","").replace(")", "").split(",")
-            start_index = int(sint[0].split("-")[0])
-            iint = [(simplex_lookup.index([dim, start_index])) + offs]
+            sint = toks[0].replace("[","").replace(")", "").split(",")
+            if sint[0] == sint[1]:
+                continue
+            iint = [float(sint[0])]
+            bounds.append(float(sint[0]))
             if sint[1].strip() != "":
-                end_index = int(sint[1].split("-")[0])
-                iint.append(simplex_lookup.index([dim+1, end_index]) + offs)
+                iint.append(float(sint[1]))
+                bounds.append(float(sint[1]))
                 max_bound = max(max_bound, iint[1])
             max_bound = max(max_bound, iint[0])
             intervals[dim][1].append(iint)
     for dim, b in enumerate(intervals):
         for i, interval in enumerate(b[1]):
             if len(interval) == 1:
-                intervals[dim][1][i].append(max_bound + 1)
+                intervals[dim][1][i].append(max_bound * 1.05)
         intervals[dim][1] = sorted(intervals[dim][1], key=cmp_to_key(comp_bar))
-    return (max_bound, intervals)
+    return (sorted(list(set(bounds))), intervals)
 
-def read_simplices(input_file, exclude_rel=False):
-    f = open(input_file, "r")
-    simplex_lookup = []
-    rel = range(8)
-    for line in f:
-        if line.startswith("#s"):
-            dim = int(line[2])
-            index = int(line[3:].split("-")[0].strip())
-            #simplices = [int(s.strip()) for s in line[3:].split("-")[1].split("'")]
-            simplex_lookup.append([dim, index])
-    return simplex_lookup
-
-def plot_barcode(ax, max_bound, intervals):
-    h_inc = (max_bound + 1) * 0.01
-    h_skip = h_inc * 1.5
-    h = 0
-    ax.set_xlim(1, max_bound+1)
-    ax.set_xticks(range(1, max_bound+1))
-    ax.xaxis.grid(True, linestyle="dotted")
-    ax.set_yticks([])
-    ax.spines["left"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    for bc in intervals:
-        dim = bc[0]
-        bars = bc[1]
-        h += h_skip
-        for b in bars:
-            ax.plot(b, [h, h], color=colors[dim])
-            if b != bars[-1]:
-                h += h_inc
-    h += h_skip
-    ax.set_ylim(0,h)
-
-
-def init_ax(ax, max_bound):
-    ax.set_xlim(1, max_bound)
+def init_ax(ax, bounds, xlabels=[]):
+    ax.set_xlim(0, bounds[-1] * 1.05)
     ax.set_ylim(0,1)
-    ax.set_xticks(range(1, max_bound+1))
+    xlabels = xlabels if xlabels != [] else [str(round(b, 1)).format(1) for b in bounds]
+    ax.set_xticks(bounds, xlabels)
     ax.xaxis.grid(True, linestyle="dotted")
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
@@ -124,13 +93,12 @@ def init_ax(ax, max_bound):
 # -----------------------------------------------------------------------------
 
 input_file = sys.argv[1]
-simplex_lookup = read_simplices(input_file)
-max_bound, intervals = read_barcode(input_file, simplex_lookup)
+bounds, intervals = read_barcode(input_file)
 
 docw = 418.25372 / 72
 figw = docw
 
-dim_count = len(intervals)
+dim_count = len([bc for bc in intervals if bc[1] != []])
 bar_count = 0
 for bc in intervals:
     bar_count += len(bc[1])
@@ -150,6 +118,8 @@ yticks = []
 ylabels = []
 y = 0
 for bc in intervals:
+    if bc[1] == []:
+        continue
     y += dimskip
     tl = len(bc[1]) * barh + (len(bc[1]) - 1) * barskip
     y += tl * 0.5
@@ -166,14 +136,16 @@ fig = mplfig.Figure(figsize=(figw, figh))
 ax_dummy = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
 ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
 
-init_ax(ax_dummy, max_bound)
-init_ax(ax, max_bound)
+xlabels = [ r'$0$', "", r'$\sqrt{17}$', r'6', r'$\sqrt{41}$']
+xlabelss = [ r'$0$', r'$4$', "", r'6', r'$\sqrt{41}$']
+init_ax(ax_dummy, bounds, xlabels)
+init_ax(ax, bounds, xlabelss)
 ax_dummy.xaxis.set_ticks_position("top")
+
 ax.set_yticks(yticks, ylabels)
 for i, l in enumerate(ax.get_yticklabels()):
     l.set_color(colors[i])
 ax.yaxis.set_tick_params(length=0)
-
 
 y = 0
 for bc in intervals:
@@ -189,4 +161,4 @@ for bc in intervals:
 
 
 fig.savefig("test.pdf", format='pdf')
-fig.savefig("../thesis/img/01-barcode-4pts-index-abshom.pdf", format='pdf')
+fig.savefig("../thesis/img/01-barcode-4pts-rips-abshom.pdf", format='pdf')
