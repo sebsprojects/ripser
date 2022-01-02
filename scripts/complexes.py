@@ -103,7 +103,7 @@ figw = (subw + marginw) * num_w + marginw
 figh = (subw + marginh) * num_h + marginw
 fig = mplfig.Figure(figsize=(figw, figh))
 print(figw / docw)
-title_list = ["$X$", "$L$", "$K$", "$\\mathrm{Rips}_6(X)$", "$|\\mathrm{Rips}_6(X)|$"]
+title_list = ["$X$", "$L$", "$K$", "$\\Delta X$", "$\\widehat{\\Delta X}$"]
 axs = []
 for j in range(num_h):
     y = figh - marginh - subw - j * (subw + marginh)

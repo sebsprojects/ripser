@@ -164,4 +164,4 @@ plot_filtration(axs, simplices, points)
 
 
 fig.savefig("filt.pdf", format='pdf')
-#fig.savefig("../thesis/img/00-filt-simplexwise.pdf", format='pdf')
+fig.savefig("../thesis/img/00-filt-simplexwise.pdf", format='pdf')
