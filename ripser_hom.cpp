@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 
 #include "ripser_core.hpp"
 #include "print_utils.hpp"
@@ -59,15 +60,15 @@ void update_hom_class(ripser& ripser,
 			// dim(death) > dim(birth), need -inf workaround for birth
 			if(get_diameter(death) >
 			   std::max(0.0f, get_diameter(birth)) * ripser.config.ratio) {
-				std::cout << "d=" << dim - 1 << " :: ";
+				//std::cout << "replacing: d=" << dim - 1 << " :: ";
 				for(auto s : h.representative) {
-					std::cout << get_index(s) << " ";
+				//	std::cout << get_index(s) << " ";
 				}
-				std::cout << "vs ";
+				//std::cout << "with ";
 				for(auto s : R_rep) {
-					std::cout << get_index(s) << " ";
+				//	std::cout << get_index(s) << " ";
 				}
-				std::cout << std::endl;
+				//std::cout << std::endl;
 				h.death = death;
 			} else {
 				hc.erase(hc.begin() + i);
@@ -76,6 +77,8 @@ void update_hom_class(ripser& ripser,
 		}
 	}
 }
+
+std::ofstream os("./mat-r.txt", std::ofstream::trunc);
 
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
@@ -114,21 +117,35 @@ void compute_pairs(ripser &ripser,
 		std::vector<index_diameter_t> V_rep;
 		V_rep.push_back(sigma_j);
 		index_diameter_t e = pop_pivot(V_j);
+		//os << dim << "-" << get_index(sigma_j) << " ";
+		//std::cout << "d=" << dim << " [ ";
 		while(get_index(e) != -1) {
+			//std::cout << get_index(e) << " ";
 			V.push_back(e);
 			V_rep.push_back(e);
+			//os << dim << "-" << get_index(e) << " ";
 			e = pop_pivot(V_j);
 		}
+		//os << std::endl;
+		//std::cout << get_index(sigma_j) << " ]" << std::endl;
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
 			std::vector<index_diameter_t> R_rep;
 			e = pop_pivot(R_j);
 			while(get_index(e) != -1) {
+				os << dim - 1 << "-" << get_index(e) << " ";
 				R_rep.push_back(e);
 				e = pop_pivot(R_j);
 			}
+			os << std::endl;
 			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
 		} else {
+			os << std::endl;
+			//std::cout << "adding: d=" << dim << " :: ";
+			//for(auto s : V_rep) {
+			//	std::cout << get_index(s) << " ";
+			//}
+			//std::cout << std::endl;
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
 			ripser.infos.at(dim).class_count++;
 		}
@@ -141,7 +158,7 @@ void compute_barcodes(ripser& ripser) {
 	std::sort(simplices.begin(), simplices.end(), filtration_order);
 	ripser.infos.at(0).simplex_total_count = ripser.n;
 	ripser.infos.at(0).simplex_reduction_count = ripser.n;
-	index_t dim_max = std::min(ripser.config.dim_max, ripser.n - 1);
+	index_t dim_max = std::min(ripser.config.dim_max, (int) ripser.n - 1);
 	for(index_t dim = 0; dim <= dim_max; dim++) {
 		if(dim > 0) {
 			assemble_columns_to_reduce(ripser, simplices, dim);
@@ -171,6 +188,9 @@ int main(int argc, char** argv) {
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	write_standard_output(ripser, true, true);
+
+	//std::ofstream os(ripser.config.output_path + "/mat.txt", std::ofstream::trunc);
+	//output_boundary_matrix(ripser, os);
+
 	exit(0);
 }
-

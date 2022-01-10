@@ -96,14 +96,14 @@ subw = docw * 0.14
 marginw = docw * 0.02
 marginh = docw * 0.043
 
-num_w = 5
+num_w = 6
 num_h = 1
 
 figw = (subw + marginw) * num_w + marginw
 figh = (subw + marginh) * num_h + marginw
 fig = mplfig.Figure(figsize=(figw, figh))
 print(figw / docw)
-title_list = ["$X$", "$L$", "$K$", "$\\Delta X$", "$\\widehat{\\Delta X}$"]
+title_list = ["$\{~\}$", "$X$", "$L$", "$K$", "$\\Delta X$", "$\\widehat{\\Delta X}$"]
 axs = []
 for j in range(num_h):
     y = figh - marginh - subw - j * (subw + marginh)
@@ -114,30 +114,30 @@ for j in range(num_h):
         axs.append(ax)
 
 for p in points:
-    for i in range(num_w - 1):
+    for i in range(1,num_w - 1):
         plot_point(axs[i], p, colors[0])
-
-plot_line(axs[1], [points[0], points[2]], colors[0])
-plot_line(axs[1], [points[1], points[2]], colors[0])
-plot_line(axs[1], [points[0], points[1]], colors[0])
-plot_line(axs[1], [points[3], points[0]], colors[0])
-
 
 plot_line(axs[2], [points[0], points[2]], colors[0])
 plot_line(axs[2], [points[1], points[2]], colors[0])
 plot_line(axs[2], [points[0], points[1]], colors[0])
 plot_line(axs[2], [points[3], points[0]], colors[0])
-plot_line(axs[2], [points[1], points[3]], colors[0])
-plot_trig(axs[2], [points[0], points[2], points[1]], colors[0])
+
 
 plot_line(axs[3], [points[0], points[2]], colors[0])
 plot_line(axs[3], [points[1], points[2]], colors[0])
 plot_line(axs[3], [points[0], points[1]], colors[0])
 plot_line(axs[3], [points[3], points[0]], colors[0])
 plot_line(axs[3], [points[1], points[3]], colors[0])
-plot_line(axs[3], [points[2], points[3]], colors[0])
 plot_trig(axs[3], [points[0], points[2], points[1]], colors[0])
-plot_trig(axs[3], [points[1], points[3], points[0]], colors[0])
+
+plot_line(axs[4], [points[0], points[2]], colors[0])
+plot_line(axs[4], [points[1], points[2]], colors[0])
+plot_line(axs[4], [points[0], points[1]], colors[0])
+plot_line(axs[4], [points[3], points[0]], colors[0])
+plot_line(axs[4], [points[1], points[3]], colors[0])
+plot_line(axs[4], [points[2], points[3]], colors[0])
+plot_trig(axs[4], [points[0], points[2], points[1]], colors[0])
+plot_trig(axs[4], [points[1], points[3], points[0]], colors[0])
 
 # 3D PLOT
 ax3 = fig.add_axes([x / figw + 0.01, y / figh - 0.01, subw / figw - 0.02, subw / figh - 0.02], projection="3d")

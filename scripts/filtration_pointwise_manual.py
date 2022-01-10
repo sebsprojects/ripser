@@ -129,7 +129,7 @@ subw = docw * 0.14
 marginw = docw * 0.02
 marginh = docw * 0.043
 
-num_w = 5
+num_w = 6
 num_h = 3
 
 figw = (subw + marginw) * num_w + marginw
@@ -141,26 +141,28 @@ axs = []
 for j in range(num_h):
     y = figh - marginh - subw - j * (subw + marginh)
     for i in range(num_w):
+        if j * num_w +i > 15:
+            break
         x = marginw + i * (subw + marginw)
         ax = fig.add_axes([x / figw, y / figh, subw / figw, subw / figh])
-        init_ax(ax, xlim, ylim, j * (num_w) + i + 1)
+        init_ax(ax, xlim, ylim, j * (num_w) + i)
         axs.append(ax)
 
-plot_trig(axs[10], [points[simplices[10][2][k]] for k in range(3)], colors[1])
+plot_trig(axs[11], [points[simplices[10][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[11], [points[simplices[10][2][k]] for k in range(3)], colors[0])
-plot_trig(axs[11], [points[simplices[11][2][k]] for k in range(3)], colors[1])
+plot_trig(axs[12], [points[simplices[10][2][k]] for k in range(3)], colors[0])
+plot_trig(axs[12], [points[simplices[11][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[12], [points[simplices[13][2][k]] for k in range(3)], colors[0])
-plot_trig(axs[12], [points[simplices[12][2][k]] for k in range(3)], colors[1])
+plot_trig(axs[13], [points[simplices[13][2][k]] for k in range(3)], colors[0])
+plot_trig(axs[13], [points[simplices[12][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[13], [points[simplices[12][2][k]] for k in range(3)], colors[0])
-plot_trig(axs[13], [points[simplices[13][2][k]] for k in range(3)], colors[1])
+plot_trig(axs[14], [points[simplices[12][2][k]] for k in range(3)], colors[0])
+plot_trig(axs[14], [points[simplices[13][2][k]] for k in range(3)], colors[1])
 
-plot_trig(axs[14], [points[simplices[10][2][k]] for k in range(3)], colors[1])
-plot_trig(axs[14], [points[simplices[11][2][k]] for k in range(3)], colors[1])
+plot_trig(axs[15], [points[simplices[10][2][k]] for k in range(3)], colors[1])
+plot_trig(axs[15], [points[simplices[11][2][k]] for k in range(3)], colors[1])
 
-plot_filtration(axs, simplices, points)
+plot_filtration(axs[1:], simplices, points)
 
 
 fig.savefig("filt.pdf", format='pdf')

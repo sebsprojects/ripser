@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <limits>
 #include <fstream>
+#include <vector>
 
 
 struct ripser_config {

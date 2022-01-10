@@ -19,7 +19,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
                                                entry_hash_map& pivot_column_index) {
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
-	bool check_for_emergent_pair = true;
+	bool check_for_emergent_pair = false;
 	// TODO: Find a more efficient solution to this annoying problem
 	std::vector<index_diameter_t> working_coboundary_buffer;
 	while(cofacets.has_next()) {
@@ -73,11 +73,11 @@ void assemble_columns_to_reduce(ripser &ripser,
 					if(pivot_column_index.find(get_index(cofacet)) ==
 					   pivot_column_index.end()) {
 						// Apparent Pair check
-						if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
+						//if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
 							columns_to_reduce.push_back(cofacet);
-						} else {
-							info.apparent_count++;
-						}
+						//} else {
+						//	info.apparent_count++;
+						//}
 					} else {
 						info.clearing_count++;
 					}
@@ -130,6 +130,7 @@ void compute_pairs(ripser &ripser,
 				pivot = get_pivot(working_coboundary);
 				add_count++;
 			} else {
+			  /*
 				index_diameter_t e = get_zero_apparent_facet(ripser,
 				                                             pivot,
 				                                             dim + 1);
@@ -142,9 +143,10 @@ void compute_pairs(ripser &ripser,
 					pivot = get_pivot(working_coboundary);
 					app_count++;
 				} else {
+				*/
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
-				}
+				//}
 			}
 		}
 		// Write V_j to V
@@ -162,7 +164,7 @@ void compute_pairs(ripser &ripser,
 			// Non-essential index
 			value_t birth = get_diameter(column_to_reduce);
 			value_t death = get_diameter(pivot);
-			if(death > birth * ripser.config.ratio) {
+			if(death > std::max(0.0f, birth) * ripser.config.ratio) {
 				ripser.infos.at(dim).class_count++;
 				ripser.add_hom_class(dim, column_to_reduce, pivot);
 			} else {
@@ -305,6 +307,6 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, false, total_filtration_order);
+	write_standard_output(ripser, false, true, total_filtration_order);
 	exit(0);
 }

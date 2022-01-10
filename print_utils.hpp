@@ -4,21 +4,29 @@
 #include "ripser_core.hpp"
 
 
+// index-a'b'c-diam-r
 std::string simplex_tos(ripser& ripser,
                         index_diameter_t simplex,
                         index_t dim,
+                        bool include_dim=false,
                         bool include_index=true,
                         bool include_simplices=true,
                         bool include_diameter=true,
                         bool include_rel=false)
 {
 	std::stringstream ss;
+	if(include_dim) {
+		ss << dim;
+	}
 	if(include_index) {
+		if(include_dim) {
+			ss << "-";
+		}
 		ss << get_index(simplex);
 	}
 	if(include_simplices) {
-		if(include_index) {
-		  ss << "-";
+		if(include_index || include_dim) {
+			ss << "-";
 		}
 		std::vector<index_t> vertices(dim+1, -1);
 		ripser.get_simplex_vertices(get_index(simplex), dim, ripser.n, vertices);
@@ -30,7 +38,7 @@ std::string simplex_tos(ripser& ripser,
 		}
 	}
 	if(include_diameter) {
-		if(include_index || include_simplices) {
+		if(include_index || include_simplices || include_dim) {
 			ss << "-";
 		}
 		ss << std::fixed << std::setprecision(3)
@@ -42,6 +50,61 @@ std::string simplex_tos(ripser& ripser,
 		}
 	}
 	return ss.str();
+}
+
+void output_boundary_matrix(ripser& ripser, std::ostream& os)
+{
+	std::vector<index_diameter_t> simpl_prev;
+	std::vector<index_diameter_t> simpl_curr;
+	std::vector<std::pair<index_t, index_diameter_t>> all_simplices;
+	for(index_t i = 0; i < ripser.n; i++) {
+		value_t diam = ripser.compute_diameter(i, 0);
+		simpl_curr.push_back(index_diameter_t(i, diam));
+		all_simplices.push_back(std::make_pair(0, index_diameter_t(i, 0)));
+	}
+	for(index_t i = 0; i <= ripser.config.dim_max; i++) {
+		std::swap(simpl_prev, simpl_curr);
+		simpl_curr.clear();
+		simplex_coboundary_enumerator cofacets(ripser);
+		for(auto s : simpl_prev) {
+			cofacets.set_simplex(s, i);
+			while(cofacets.has_next(false)) {
+			  index_diameter_t cofacet = cofacets.next();
+			  simpl_curr.push_back(cofacet);
+			  all_simplices.push_back(std::make_pair(i + 1, cofacet));
+			}
+		}
+	}
+	std::sort(all_simplices.begin(), all_simplices.end(), total_filtration_order);
+	simplex_boundary_enumerator facets(ripser);
+	for(auto &simp : all_simplices) {
+		if(simp.first == 0) {
+			os << std::endl;
+		} else {
+			facets.set_simplex(simp.second, simp.first);
+			while(facets.has_next()) {
+				index_diameter_t facet = facets.next();
+				os << simplex_tos(ripser, facet, simp.first - 1, 1, 1, 0, 0, 0);
+				os << " ";
+			}
+			os << std::endl;
+		}
+	}
+	// Output of row-indices that are non-zero (not ordered correctly)
+	/*
+	simplex_coboundary_enumerator cofacets(ripser);
+	for(auto &simp : all_simplices) {
+		cofacets.set_simplex(simp.second, simp.first);
+		while(cofacets.has_next()) {
+			index_diameter_t cofacet = cofacets.next();
+			auto it = std::find(all_simplices.begin(), all_simplices.end(), std::make_pair(simp.first + 1, cofacet));
+			if(it != all_simplices.end()) {
+				os << std::distance(all_simplices.begin(), it) << " ";
+			}
+		}
+		os << std::endl;
+	}
+	*/
 }
 
 void output_barcode_simplices(ripser& ripser, std::ostream& os,
@@ -61,7 +124,7 @@ void output_barcode_simplices(ripser& ripser, std::ostream& os,
 	for(auto &s : all_simplices) {
 		std::string p = pref ? ("#s" + std::to_string(s.first) + "  ") : "";
 		os << p
-		   << simplex_tos(ripser, s.second, s.first, true, true, true, true)
+		   << simplex_tos(ripser, s.second, s.first, true, true, true, true, true)
 		   << std::endl;
 	}
 }
@@ -95,7 +158,7 @@ void output_all_simplices(ripser& ripser, std::ostream& os,
 	for(auto &s : all_simplices) {
 		std::string p = pref ? ("#s" + std::to_string(s.first) + "  ") : "";
 		os << p
-		   << simplex_tos(ripser, s.second, s.first, true, true, true, true)
+		   << simplex_tos(ripser, s.second, s.first, true, true, true, true, true)
 		   << std::endl;
 	}
 }
@@ -118,7 +181,7 @@ void output_all_simplices_by_dim(ripser& ripser, std::ostream& os,
 			   << std::to_string(i) << std::endl;
 			for(auto& s : simpl_curr) {
 				os << p << "  "
-				   << simplex_tos(ripser, s, i, true, (i != 0), false)
+				   << simplex_tos(ripser, s, i, false, true, (i != 0), false)
 				   << std::endl;
 			}
 		}
@@ -156,17 +219,17 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 			} else {
 				os << "," << death << ")";
 			}
-			os << " ; [" << simplex_tos(ripser, hc.birth, d, 1, 1, 0, 0);
+			os << " ; [" << simplex_tos(ripser, hc.birth, d, 0, 1, 1, 0, 0);
 			if(death == INF) {
 				os << ", )";
 			} else {
-				os << "," << simplex_tos(ripser, hc.death, d + 1, 1, 1, 0, 0)
+				os << "," << simplex_tos(ripser, hc.death, d + 1, 0, 1, 1, 0, 0)
 				   << ")";
 			}
 			if(with_reps) {
 				os << " ; ";
 				for(index_diameter_t& simp : hc.representative) {
-					os << simplex_tos(ripser, simp, d, false, true, false);
+					os << simplex_tos(ripser, simp, d, false, false, true, false);
 					if(simp != hc.representative.back()) {
 						os << " :: ";
 					}
@@ -325,7 +388,7 @@ void write_standard_output(ripser& ripser,
 	std::ofstream ofs = get_writeout_stream(ripser);
 	output_config(ripser, ofs, true); ofs << std::endl;
 	if(with_simplex_list) {
-		output_barcode_simplices(ripser, ofs, ord, true);
+		output_all_simplices(ripser, ofs, ord, true);
 		ofs << std::endl;
 	}
 	output_info(ripser, ofs, -1, true); ofs << std::endl;

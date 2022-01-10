@@ -89,9 +89,7 @@ def init_ax(ax, xlim, ylim, s):
     ax.set_title(r'$t=' + s + "$", pad=5)
 
 def plot_filtration(axs, simplices, diams, points, title_list):
-    xlim, ylim = get_limits(points)
     for i in range(len(diams)):
-        init_ax(axs[i], xlim, ylim, title_list[i])
         for simp in simplices:
             if simp[0] > diams[i]:
                 break
@@ -120,13 +118,18 @@ def plot_trig(ax, ps, c):
 # MAIN
 # -----------------------------------------------------------------------------
 
+input_file = sys.argv[1]
+read_dataset()
+diams, simplices = read_simplices()
+points = read_dataset()
+
 docw = 418.25372 / 72
 
 subw = docw * 0.14
 marginw = docw * 0.02
 marginh = docw * 0.043
 
-num_w = 5
+num_w = 6
 num_h = 1
 
 figw = (subw + marginw) * num_w + marginw
@@ -136,29 +139,25 @@ fig = mplfig.Figure(figsize=(figw, figh))
 
 print(figw / docw)
 
-title_list = ["0", "4", "\\sqrt{17}", "6", "\\sqrt{41}"]
+title_list = ["-1", "0", "4", "\\sqrt{17}", "6", "\\sqrt{41}"]
 
 axs = []
+xlim, ylim = get_limits(points)
 for j in range(num_h):
     y = figh - marginh - subw - j * (subw + marginh)
     for i in range(num_w):
         x = marginw + i * (subw + marginw)
         ax = fig.add_axes([x / figw, y / figh, subw / figw, subw / figh])
         axs.append(ax)
+        init_ax(axs[i], xlim, ylim, title_list[i])
 
-input_file = sys.argv[1]
 
-read_dataset()
-diams, simplices = read_simplices()
-points = read_dataset()
 
-print(simplices)
-
-plot_filtration(axs, simplices, diams, points, title_list)
+plot_filtration(axs[1:], simplices, diams, points, title_list)
 
 # MANUAL TO AVOID OVERLAPS
-plot_trig(axs[4], [points[0], points[1], points[2]], colors[1])
-plot_trig(axs[4], [points[0], points[1], points[3]], colors[1])
+plot_trig(axs[5], [points[0], points[1], points[2]], colors[1])
+plot_trig(axs[5], [points[0], points[1], points[3]], colors[1])
 
 
 fig.savefig("filt.pdf", format='pdf')

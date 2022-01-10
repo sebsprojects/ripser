@@ -10,11 +10,9 @@ import math
 import sys
 from functools import cmp_to_key
 
-
 if len(sys.argv) < 1:
     print("error: missing config file-path")
     sys.exit()
-
 
 # MATPLOTLIB SETUP
 # -----------------------------------------------------------------------------

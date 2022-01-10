@@ -70,9 +70,6 @@ def read_barcode(input_file, simplex_lookup):
             max_bound = max(max_bound, iint[0])
             intervals[dim][1].append(iint)
     for dim, b in enumerate(intervals):
-        for i, interval in enumerate(b[1]):
-            if len(interval) == 1:
-                intervals[dim][1][i].append(max_bound + 1)
         intervals[dim][1] = sorted(intervals[dim][1], key=cmp_to_key(comp_bar))
     return (max_bound, intervals)
 
@@ -88,32 +85,10 @@ def read_simplices(input_file, exclude_rel=False):
             simplex_lookup.append([dim, index])
     return simplex_lookup
 
-def plot_barcode(ax, max_bound, intervals):
-    h_inc = (max_bound + 1) * 0.01
-    h_skip = h_inc * 1.5
-    h = 0
-    ax.set_xlim(1, max_bound+1)
-    ax.set_xticks(range(1, max_bound+1))
-    ax.xaxis.grid(True, linestyle="dotted")
-    ax.set_yticks([])
-    ax.spines["left"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    for bc in intervals:
-        dim = bc[0]
-        bars = bc[1]
-        h += h_skip
-        for b in bars:
-            ax.plot(b, [h, h], color=colors[dim])
-            if b != bars[-1]:
-                h += h_inc
-    h += h_skip
-    ax.set_ylim(0,h)
-
-
 def init_ax(ax, max_bound):
-    ax.set_xlim(1, max_bound)
+    ax.set_xlim(0, max_bound)
     ax.set_ylim(0,1)
-    ax.set_xticks(range(1, max_bound+1))
+    ax.set_xticks(range(0, max_bound+1))
     ax.xaxis.grid(True, linestyle="dotted")
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
@@ -181,8 +156,18 @@ for bc in intervals:
     bars = bc[1]
     y += dimskip
     for b in bars:
-        rect = pat.Rectangle((b[0], y / h), b[1] - b[0], barh / h, linewidth=0, facecolor=colors[dim])
+        r = 0.25
+        essential = False
+        if len(b) == 1:
+            essential = True
+            b.append(max_bound)
+        rect = pat.Rectangle((b[0], y / h), b[1] - b[0] - r * 0.5, barh / h, linewidth=0, facecolor=colors[dim])
+        print(w / max_bound)
+        c1 = pat.Ellipse((b[0], (y + 0.5 * barh) / h), r, r * (w / 16), facecolor=colors[dim])
+        c2 = pat.Ellipse((b[1], (y + 0.5 * barh) / h), r, r * (w / 16), fill=essential, facecolor=colors[dim], ec=colors[dim], clip_on=False, lw=1.5)
         ax.add_patch(rect)
+        ax.add_patch(c1)
+        ax.add_patch(c2)
         y += barh
         if b != bars[-1]:
             y += barskip

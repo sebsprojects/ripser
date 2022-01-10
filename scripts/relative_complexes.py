@@ -199,8 +199,8 @@ for i in range(len(points)):
         else:
             c = colors[0]
         plot_line(axs[2], [points[i], points[j]], c)
-plot_trig(axs[2], points[0:3], "lightgrey")
-plot_trig(axs[2], [points[1], points[3], points[0]], "lightgrey")
+plot_trig(axs[2], points[0:3], colors[0])
+plot_trig(axs[2], [points[1], points[3], points[0]], colors[0])
 
 
 def norm2(p1, p2):
@@ -241,8 +241,8 @@ for i in range(len(fpoints)):
         else:
             c = colors[0]
         plot_line(axs[3], [fpoints[i], fpoints[j]], c)
-plot_trig(axs[3], [fpoints[0], fpoints[2], fpoints[4]], "lightgrey")
-plot_trig(axs[3], [fpoints[0], fpoints[2], fpoints[6]], "lightgrey")
+plot_trig(axs[3], [fpoints[0], fpoints[2], fpoints[4]], colors[0])
+plot_trig(axs[3], [fpoints[0], fpoints[2], fpoints[6]], colors[0])
 plot_trig(axs[3], [fpoints[1], fpoints[3], fpoints[5]], "lightgrey")
 plot_trig(axs[3], [fpoints[1], fpoints[3], fpoints[7]], "lightgrey")
 
