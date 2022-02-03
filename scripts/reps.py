@@ -73,33 +73,37 @@ def init_ax(ax):
 def transform_point(p, sx, sy, tx, ty):
     return [p[0] * sx + tx, p[1] * sy + ty]
 
-def plot_rep(ax, rep, sx, sy, tx, ty):
+def plot_rep(ax, rep, col, sx, sy, tx, ty,omit_dim2=False):
+    if rep == []:
+        return
     for rep_simplex in rep[1]:
         for s in simplex_lookup:
             if s[0] == 0:
                 ps = [transform_point(points[v], sx, sy, tx, ty) for v in s[2]]
-                c = colors[1] if s[0] == rep[0] and s[2][0] in rep[1] else "lightgrey"
+                c = col if s[0] == rep[0] and s[2][0] in rep[1] else "lightgrey"
                 zorder = 3 if rep[0] == 0 else 0
                 plot_point(ax, ps[0], c, zorder)
             if s[0] == 1:
                 ps = [transform_point(points[v], sx, sy, tx, ty) for v in s[2]]
                 if rep[0] == 1 and s[1] in rep[1]:
-                    c = colors[1]
+                    c = col
                     zorder = 2
                 else:
                     c = "lightgrey"
                     zorder = -1
+                # Draw only the outer outline for dim=2 and dim=3
+                if rep[0] >= 2:
+                    if s[1] == 5 or s[1] == 0:
+                        zorder = -2
+                    else:
+                        zorder = 3
                 plot_line(ax, ps, c, zorder)
-            if s[0] == 2:
-                ps = [transform_point(points[v], sx, sy, tx, ty) for v in s[2]]
-                if rep[0] == 2 and s[1] in rep[1]:
-                    c = colors[1]
-                    zorder = -2
-                else:
-                    c = "lightgrey"
-                    zorder = -3
-                plot_trig(ax, ps, c, zorder)
-
+    # MANUAL DIM=2
+    if not omit_dim2:
+        tps = [transform_point(points[v], sx, sy, tx, ty) for v in [1,2,3]]
+        plot_trig(ax, tps, "lightgrey", -3, 0.5)
+        tps = [transform_point(points[v], sx, sy, tx, ty) for v in [0,2,3]]
+        plot_trig(ax, tps, "lightgrey", -3, 0.5)
 
 def plot_point(ax, p, c, zorder):
     ax.plot([p[0]], [p[1]], "o", color=c, markersize=3, zorder=0)
@@ -109,8 +113,8 @@ def plot_line(ax, ps, c, zorder):
     lc = mc.LineCollection([ps], colors=cs, zorder=zorder)
     ax.add_collection(lc)
 
-def plot_trig(ax, ps, c, zorder):
-    trig = plt.Polygon(ps, color=c, zorder=zorder)
+def plot_trig(ax, ps, c, zorder, alpha=0.5):
+    trig = plt.Polygon(ps, zorder=zorder, alpha=alpha, fill=True, facecolor=c, lw=0)
     ax.add_patch(trig)
 
 # MAIN
@@ -120,33 +124,30 @@ input_file = sys.argv[1]
 simplex_lookup = read_simplices(input_file)
 points = read_dataset()
 
-print(simplex_lookup)
-
-z0 = [[0, [3]], [0, [2]], [0, [1]], [0, [0]]]
-z1 = [[1, [4,2,3,1]], [1, [5,3,1]], [1, [0,2,1]]]
-z2 = [[2, [0,1,2,3]]]
-
-b0 = [[0, []], [0, [2,3]], [0, [1,2]], [0, [0, 2]]]
-b1 = [[1, [4,2,3,1]], [1, [5,4,2]], [1, [0,4,3]]]
-b2 = [[2, [0,1,2,3]]]
+z0 = [[0, [0,1,2,3]], [0, [2,0]], [0, [1]], [0, [0]]]
+z12 = [[1, [4,5]], [1, [5]], [1, [0]], [2, [2]]]
 
 
-reps = [[z0, b0], [z1, b1], [z2, b2]]
+reps = [z0, z12]
 
 docw = 418.25372 / 72
-figw = docw
-h = docw
-
-rep_h = docw * 0.05
-rep_skip = rep_h * 0.75
+rep_h = docw * 0.07
+rep_w = rep_h * (3 / 2)
+rep_skip = rep_h * 0.5
+rep_skipx = rep_h
 dim_skip = rep_h * 1
 
-subplotxmargin = docw * 0.02
-subplotymargin = docw * 0.04
-x = 2 * subplotymargin
+w = 4 * rep_w + 3 * rep_skipx + 2 * rep_skip
+h = 2 * rep_h * 1 + dim_skip + 1 * rep_skip
+
+
+subplotymargin = docw * 0.00
+x = subplotymargin
 y = subplotymargin
-w = figw - 2 * subplotymargin - subplotxmargin
+figw = w + 2 * subplotymargin
 figh = h + 2 * subplotymargin
+
+print(figw / docw)
 
 fig = mplfig.Figure(figsize=(figw, figh))
 ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
@@ -166,21 +167,26 @@ init_ax(ax)
 sy = (rep_h / 4) / h
 sx = sy * (h / w)
 
-y = 2 * sy + rep_skip / h
-rep_w = rep_h * (3 / 2)
 x = 3 * sx + rep_skip / w
+y = 2 * sy + rep_skip / h
 
-for [zs, bs] in reps:
-    for rep in zs:
-        plot_rep(ax, rep, sx, sy, x, y)
-        x += (rep_w + rep_skip) / w
-    y += (rep_h + rep_skip) / h
-    x = 3 * sx + rep_skip / w
-    for rep in bs:
-        plot_rep(ax, rep, sx, sy, x, y)
-        x += (rep_w + rep_skip) / w
-    y += (rep_h + dim_skip) / h
-    x = 3 * sx + rep_skip / w
+for rs in reps:
+    for rep in rs:
+        omit = (rs == reps[-1]) and (rep == rs[-1])
+        plot_rep(ax, rep, colors[0], sx, sy, x, y, omit)
+        if rep != rs[-1]:
+            x += (rep_w + rep_skipx) / w
+    if rs != reps[-1]:
+        y += (rep_h + rep_skip) / h
+        x = 3 * sx + rep_skip / w
+
+rep = reps[1][-1]
+for s in simplex_lookup:
+    if s[0] == rep[0] and s[1] == rep[1][0]:
+        tps = [transform_point(points[v], sx, sy, x, y) for v in s[2]]
+        plot_trig(ax, tps, colors[0], -3, 0.8)
+        tps = [transform_point(points[v], sx, sy, x, y) for v in [3,1,2]]
+        plot_trig(ax, tps, "lightgrey", 0)
 
 fig.savefig("test.pdf", format='pdf')
-#fig.savefig("../thesis/img/01-barcode-4pts-index-abshom.pdf", format='pdf')
+fig.savefig("../thesis/img/01-cohom-reps.pdf", format='pdf')

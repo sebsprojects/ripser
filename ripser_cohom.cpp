@@ -89,6 +89,8 @@ void update_hom_class(ripser& ripser,
 	}
 }
 
+std::ofstream os("./mat-v.txt", std::ofstream::trunc);
+
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    const index_t dim) {
@@ -126,11 +128,15 @@ void compute_pairs(ripser &ripser,
 		std::vector<index_diameter_t> V_rep;
 		V_rep.push_back(sigma_j);
 		index_diameter_t e = pop_pivot(V_j);
+		os << (get_index(pivot) != -1) << " " << dim << "-" << get_index(sigma_j) << " ";
+		//std::cout << "d=" << dim << " [ ";
 		while(get_index(e) != -1) {
 			V.push_back(e);
 			V_rep.push_back(e);
+			os << dim << "-" << get_index(e) << " ";
 			e = pop_pivot(V_j);
 		}
+		os << std::endl;
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
 			std::vector<index_diameter_t> R_rep;
@@ -139,7 +145,7 @@ void compute_pairs(ripser &ripser,
 				R_rep.push_back(e);
 				e = pop_pivot(R_j);
 			}
-			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
+			update_hom_class(ripser, dim, pivot, sigma_j, V_rep);
 		} else {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
 			ripser.infos.at(dim).class_count++;
@@ -149,7 +155,7 @@ void compute_pairs(ripser &ripser,
 
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
-	index_t dim_max = std::min(ripser.config.dim_max, ripser.n - 1);
+	index_t dim_max = std::min(ripser.config.dim_max, (int) ripser.n - 1);
 	assemble_all_simplices(ripser, simplices, dim_max);
 	std::sort(simplices.begin(), simplices.end(), reverse_filtration_order);
 	ripser.infos.at(dim_max).simplex_total_count = simplices.size();

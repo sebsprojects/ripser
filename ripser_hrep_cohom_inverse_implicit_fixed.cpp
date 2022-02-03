@@ -15,7 +15,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
                                                entry_hash_map& pivot_column_index) {
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
-	bool check_for_emergent_pair = false;
+	bool check_for_emergent_pair = true;
 	std::vector<index_diameter_t> working_coboundary_buffer;
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
@@ -23,17 +23,17 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 		if(get_diameter(cofacet) <= ripser.threshold) {
 			working_coboundary_buffer.push_back(cofacet);
 			// Emergent pair candidate check
-			if(check_for_emergent_pair &&
-			   (get_diameter(simplex) == get_diameter(cofacet))) {
+			//if(check_for_emergent_pair &&
+			//   (get_diameter(simplex) == get_diameter(cofacet))) {
 				// Apparent pair check
-				if((pivot_column_index.find(get_index(cofacet)) ==
-				    pivot_column_index.end()) &&
-				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
-					ripser.infos.at(dim).emergent_count++;
-					return cofacet;
-				}
-				check_for_emergent_pair = false;
-			}
+			//	if((pivot_column_index.find(get_index(cofacet)) ==
+			//	    pivot_column_index.end()) &&
+			//	   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
+			//		ripser.infos.at(dim).emergent_count++;
+			//		return cofacet;
+			//	}
+			//	check_for_emergent_pair = false;
+			//}
 		}
 	}
 	for(index_diameter_t cofacet : working_coboundary_buffer) {
@@ -126,13 +126,13 @@ void compute_pairs(ripser &ripser,
 			} else {
 				//index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
 				//if(get_index(e) != -1) {
-					//add_simplex_coboundary(ripser,
-					//                       e,
-					//                       dim,
-					//                       working_reduction_column,
-					//                       working_coboundary);
-					//pivot = get_pivot(working_coboundary);
-					//app_count++;
+				//	add_simplex_coboundary(ripser,
+				//	                       e,
+				//	                       dim,
+				//	                       working_reduction_column,
+				//	                       working_coboundary);
+				//	pivot = get_pivot(working_coboundary);
+				//	app_count++;
 				//} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
@@ -150,7 +150,7 @@ void compute_pairs(ripser &ripser,
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			// Non-essential index
-			if(get_diameter(pivot) > get_diameter(column_to_reduce) * ripser.config.ratio) {
+			if(get_diameter(pivot) > std::max(0.0f, get_diameter(column_to_reduce)) * ripser.config.ratio) {
 				ripser.add_hom_class(dim, column_to_reduce, pivot);
 			}
 		} else {
@@ -391,6 +391,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, false, true);
+	write_standard_output(ripser, true,itrue);
+	std::cout << "WRITING BITCH" << std::endl;
 	exit(0);
 }

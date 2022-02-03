@@ -307,6 +307,6 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, false, true, total_filtration_order);
+	write_standard_output(ripser, true, true, total_filtration_order);
 	exit(0);
 }
