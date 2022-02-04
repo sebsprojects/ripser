@@ -17,7 +17,7 @@ PI = math.pi
 tex_fonts = {
     "text.usetex": True,
     "font.family": "serif",
-    "axes.labelsize": 11,
+    "axes.labelsize": 9,
     "font.size": 9,
     "legend.fontsize": 9,
     "xtick.labelsize": 9,
@@ -71,13 +71,14 @@ def write_dataset(samples, filename):
 def diff2(a, b):
     return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-def plot_edges(ax, samples, thresh):
+def init_plotax(ax):
     ax.set_xlim(-1.2, 1.2)
     ax.set_ylim(-1.2, 1.2)
     ax.set_aspect('equal')
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title(r'$t=' + str(thresh) + "$", pad=3)
+
+def plot_edges(ax, samples, thresh):
     x, y = zip(*samples)
     ax.scatter(x, y, s=7, zorder=2)
     lines = []
@@ -88,10 +89,7 @@ def plot_edges(ax, samples, thresh):
             b = samples[j]
             dist_ab = diff2(a,b)
             if dist_ab <= thresh:
-                if True:
-                    cs.append(colors[0])
-                else:
-                    cs.append(colors[0])
+                cs.append(colors[0])
                 lines.append([a, b])
             for k in range(0,j):
                 c = samples[k]
@@ -100,7 +98,21 @@ def plot_edges(ax, samples, thresh):
                 if dist <= thresh:
                     trig = plt.Polygon([a,b,c], alpha=0.7, zorder=0)
                     ax.add_patch(trig)
-    lc = mc.LineCollection(lines, colors=cs, linewidths=1, zorder=1)
+    lc = mc.LineCollection(lines, colors=cs, linewidths=1, zorder=3)
+    ax.add_collection(lc)
+
+def plot_rep(ax, samples, rep):
+    x, y = zip(*samples)
+    ax.scatter(x, y, s=1, zorder=2)
+    lines = []
+    cs = []
+    for i in range(0, len(samples)):
+        for j in range(0, i):
+            a = samples[i]
+            b = samples[j]
+            if [j,i] in rep:
+                lines.append([a,b])
+    lc = mc.LineCollection(lines, linewidths=1, zorder=3)
     ax.add_collection(lc)
 
 def comp_bar(a, b):
@@ -154,8 +166,6 @@ def init_barax(ax):
 input_file = sys.argv[1]
 bounds, intervals, reps = read_barcode(input_file)
 
-print(reps[1])
-
 docw = 418.25372 / 72
 subw = docw * 0.225
 marginw = docw * 0.02
@@ -163,41 +173,41 @@ marginh = docw * 0.043
 nx = 4
 ny = 2
 
-plot_skip = docw * 0.05
-
 barh = 0.006 * docw
 barskip = barh * 1.5
 bar_count = len(intervals[1][1])
 h = bar_count * (barh + barskip) + barskip
 
+repw = (docw - 7 * marginw) / 6
+
 figw = nx * subw + (nx+1) * marginw
-figh = ny * subw + (ny+1) * marginh + h + plot_skip
+figh = ny * subw + (ny+1) * marginh + marginh * 2 + h + 2 * repw
 
 fig = mplfig.Figure(figsize=(figw, figh))
 
-print(figw / docw)
-
 data = gen_intro_ex_2(15)
+print(len(data))
 
 axs = []
 y = figh - marginh - subw
 x = marginw
 
-threshs = [0, 0.319, 0.369, 0.4149, 0.501, 0.545, 0.592, 0.851]
-reps_to_plot = [[], [0], [0, 1], [], [], [], [], []]
+threshs = [0, 0.33, 0.38, 0.45, 0.5, 0.54, 0.57, 0.87]
 
 for i in range(0, nx * ny):
     ax = fig.add_axes([x / figw, y / figh, subw / figw, subw / figh])
+    init_plotax(ax)
 #   init_ax(ax, small_lims[0], small_lims[1], str(n))
     axs.append(ax)
     plot_edges(ax, data, threshs[i])
+    ax.set_title(r'$t_{' + str(i) + '}=' + str(threshs[i]) + '$', pad=3)
     x += subw + marginw
     if i == 3:
         x = marginw
         y = y - subw - marginh
 
 x = marginw
-y = y - h - plot_skip
+y = y - h - marginh
 subw = figw - 2 * marginw
 
 barax = fig.add_axes([x / figw, y / figh, subw / figw, h / figh])
@@ -208,16 +218,32 @@ init_barax(barax)
 barax_dummy.xaxis.set_ticks_position("top")
 #barax_dummy.set_xticks([round(t,2) for t in threshs])
 barax_dummy.set_xticks(threshs)
-barax_dummy.set_xticklabels([])
+barax_dummy.set_xticklabels(["$t_{" + str(i) + "}$" for i in range(8)])
 barax_dummy.xaxis.grid(True, linestyle="dotted")
+barax.tick_params(axis='both', which='major', pad=1)
+barax_dummy.tick_params(axis='both', which='major', pad=1.5)
 
-y = barskip
+hh = barskip
 for b in intervals[1][1]:
-    rect = pat.Rectangle((b[0], y / h), b[1] - b[0], barh / h, linewidth=0, facecolor=colors[0])
+    rect = pat.Rectangle((b[0], hh / h), b[1] - b[0], barh / h, linewidth=0, facecolor=colors[0])
     barax_dummy.add_patch(rect)
-    y += barh
+    hh += barh
     if b != intervals[1][1][-1]:
-        y += barskip
+        hh += barskip
+
+y = y - h
+
+repaxs = []
+for i in range(12):
+    ax = fig.add_axes([x / figw, y / figh, repw / figw, repw / figh])
+    init_plotax(ax)
+    repaxs.append(ax)
+    plot_rep(ax, data, reps[1][1][i])
+    x += repw + marginw
+    if i == 5:
+        x = marginw
+        y = y - repw - marginh * 0.5
+
 
 fig.savefig("intro.pdf", format='pdf')
 fig.savefig("../thesis/img/00-intro-example.pdf", format='pdf')
