@@ -30,6 +30,7 @@ index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
 void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& simplices,
                                 const index_t dim) {
+	time_point assemble_start = get_time();
 	std::vector<index_diameter_t> next_simplices;
 	simplex_coboundary_enumerator cofacets(ripser);
 	for(index_diameter_t& simplex : simplices) {
@@ -44,6 +45,7 @@ void assemble_columns_to_reduce(ripser &ripser,
 	}
 	simplices.swap(next_simplices);
 	std::sort(simplices.begin(), simplices.end(), filtration_order);
+	ripser.infos.at(dim).assemble_dur = get_duration(assemble_start, get_time());
 	ripser.infos.at(dim).simplex_total_count = simplices.size();
 	ripser.infos.at(dim).simplex_reduction_count = simplices.size();
 }
@@ -60,15 +62,6 @@ void update_hom_class(ripser& ripser,
 			// dim(death) > dim(birth), need -inf workaround for birth
 			if(get_diameter(death) >
 			   std::max(0.0f, get_diameter(birth)) * ripser.config.ratio) {
-				//std::cout << "replacing: d=" << dim - 1 << " :: ";
-				for(auto s : h.representative) {
-				//	std::cout << get_index(s) << " ";
-				}
-				//std::cout << "with ";
-				for(auto s : R_rep) {
-				//	std::cout << get_index(s) << " ";
-				}
-				//std::cout << std::endl;
 				h.death = death;
 			} else {
 				hc.erase(hc.begin() + i);
@@ -78,11 +71,10 @@ void update_hom_class(ripser& ripser,
 	}
 }
 
-std::ofstream os("./mat-r.txt", std::ofstream::trunc);
-
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    const index_t dim) {
+	time_point reduction_start = get_time();
 	compressed_sparse_matrix V;
 	entry_hash_map pivot_column_index;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
@@ -117,45 +109,34 @@ void compute_pairs(ripser &ripser,
 		std::vector<index_diameter_t> V_rep;
 		V_rep.push_back(sigma_j);
 		index_diameter_t e = pop_pivot(V_j);
-		//os << dim << "-" << get_index(sigma_j) << " ";
-		//std::cout << "d=" << dim << " [ ";
 		while(get_index(e) != -1) {
-			//std::cout << get_index(e) << " ";
 			V.push_back(e);
 			V_rep.push_back(e);
-			//os << dim << "-" << get_index(e) << " ";
 			e = pop_pivot(V_j);
 		}
-		//os << std::endl;
-		//std::cout << get_index(sigma_j) << " ]" << std::endl;
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
 			std::vector<index_diameter_t> R_rep;
 			e = pop_pivot(R_j);
 			while(get_index(e) != -1) {
-				os << dim - 1 << "-" << get_index(e) << " ";
 				R_rep.push_back(e);
 				e = pop_pivot(R_j);
 			}
-			os << std::endl;
 			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
-		} else {
-			os << std::endl;
-			//std::cout << "adding: d=" << dim << " :: ";
-			//for(auto s : V_rep) {
-			//	std::cout << get_index(s) << " ";
-			//}
-			//std::cout << std::endl;
+		} else if(dim == ripser.n - 1 || dim < ripser.config.dim_max) {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
-			ripser.infos.at(dim).class_count++;
+			//ripser.infos.at(dim).class_count++;
 		}
 	}
+	ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
 }
 
 void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
+	time_point assemble_start = get_time();
 	assemble_all_simplices(ripser, simplices, 0);
 	std::sort(simplices.begin(), simplices.end(), filtration_order);
+	ripser.infos.at(0).assemble_dur = get_duration(assemble_start, get_time());
 	ripser.infos.at(0).simplex_total_count = ripser.n;
 	ripser.infos.at(0).simplex_reduction_count = ripser.n;
 	index_t dim_max = std::min(ripser.config.dim_max, (int) ripser.n - 1);
@@ -183,14 +164,10 @@ int main(int argc, char** argv) {
 	ripser ripser(config);
 	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
-	output_all_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
+	//output_all_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
-	output_barcode(ripser, std::cout, true); std::cout << std::endl;
+	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, true);
-
-	//std::ofstream os(ripser.config.output_path + "/mat.txt", std::ofstream::trunc);
-	//output_boundary_matrix(ripser, os);
-
 	exit(0);
 }

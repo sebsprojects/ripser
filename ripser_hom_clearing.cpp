@@ -31,6 +31,7 @@ void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& columns_to_reduce,
                                 entry_hash_map& pivot_column_index,
                                 const index_t dim) {
+	time_point assemble_start = get_time();
 	std::vector<index_diameter_t> next_simplices;
 	simplex_boundary_enumerator facets(ripser);
 	for(index_diameter_t& simplex : simplices) {
@@ -40,7 +41,9 @@ void assemble_columns_to_reduce(ripser &ripser,
 			// Threshold check
 			if(get_diameter(facet) <= ripser.threshold) {
 				// TODO: This should be done more efficiently in the enumerator
-				if(std::find(next_simplices.begin(), next_simplices.end(), facet) == next_simplices.end()) {
+				if(std::find(next_simplices.begin(), next_simplices.end(), facet) ==
+				   next_simplices.end())
+				{
 					if(pivot_column_index.find(get_index(facet)) ==
 					   pivot_column_index.end()) {
 						columns_to_reduce.push_back(facet);
@@ -54,14 +57,16 @@ void assemble_columns_to_reduce(ripser &ripser,
 	}
 	simplices.swap(next_simplices);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), filtration_order);
+	ripser.infos.at(dim).assemble_dur = get_duration(assemble_start, get_time());
 	ripser.infos.at(dim).simplex_total_count = simplices.size();
-	ripser.infos.at(dim).simplex_reduction_count = simplices.size();
+	ripser.infos.at(dim).simplex_reduction_count = columns_to_reduce.size();
 }
 
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
                    entry_hash_map& pivot_column_index,
                    const index_t dim) {
+	time_point reduction_start = get_time();
 	compressed_sparse_matrix V;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		V.append_column();
@@ -110,13 +115,16 @@ void compute_pairs(ripser &ripser,
 					e = pop_pivot(R_j);
 				}
 				ripser.add_hom_class(dim - 1, pivot, sigma_j, R_rep);
-				ripser.infos.at(dim - 1).class_count++;
+				ripser.infos.at(dim).class_count++;
+			} else {
+				ripser.infos.at(dim).zero_pers_count++;
 			}
-		} else {
+		} else if(dim == ripser.n - 1 || dim < ripser.config.dim_max) {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
 			ripser.infos.at(dim).class_count++;
 		}
 	}
+	ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
 }
 
 void compute_barcodes(ripser& ripser) {
@@ -124,8 +132,10 @@ void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> columns_to_reduce;
 	entry_hash_map pivot_column_index;
 	index_t dim_max = std::min(ripser.config.dim_max, (int) ripser.n - 1);
+	time_point assemble_start = get_time();
 	assemble_all_simplices(ripser, simplices, dim_max);
 	std::sort(simplices.begin(), simplices.end(), filtration_order);
+	ripser.infos.at(dim_max).assemble_dur = get_duration(assemble_start, get_time());
 	ripser.infos.at(dim_max).simplex_total_count = simplices.size();
 	ripser.infos.at(dim_max).simplex_reduction_count = simplices.size();
 	for(index_t dim = dim_max; dim >= 0; dim--) {
@@ -164,7 +174,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, true, false);
+	//write_standard_output(ripser, true, false);
 	exit(0);
 }
 

@@ -256,7 +256,7 @@ compressed_lower_distance_matrix read_distance_matrix(ripser_config& config,
 			continue;
 		}
 		std::istringstream s(line);
-		for (int j = 0; j < i; ++j) {
+		for (int j = 0; j <= i; ++j) {
 			s >> value;
 			if(!is_absolute_index(config, j)) {
 				continue;
@@ -495,7 +495,7 @@ struct ripser {
 		} else {
 			threshold = config.config_threshold;
 		}
-		for(index_t i = 0; i <= config.dim_max + 1; ++i) {
+		for(index_t i = 0; i <= config.dim_max; ++i) {
 			infos.push_back(info(i));
 			hom_classes.push_back(std::vector<homology_class>());
 		}

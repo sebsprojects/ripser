@@ -202,7 +202,7 @@ void output_all_simplices_by_dim(ripser& ripser, std::ostream& os,
 
 void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, index_t dim=-1, bool pref=false)
 {
-	for(index_t d = 0; d <= (index_t) ripser.config.dim_max + 1; d++) {
+	for(index_t d = 0; d <= (index_t) ripser.config.dim_max; d++) {
 		if(!(dim == -1 || d == dim)) {
 			continue;
 		}
@@ -249,29 +249,32 @@ void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=fal
 	for(info& info : ripser.infos) {
 		std::string p = pref ? ("#i" + std::to_string(info.dim) + " ") : "";
 		if(dim == -1 || info.dim == dim) {
-			os << (pref ? "# " : "") << "info in dim=" << info.dim << ":"
+			duration total_dur = info.assemble_dur + info.reduction_dur + info.representative_dur;
+			os << (pref ? "# " : "") << "reduction info in dim=" << info.dim << ":"
 			   << std::endl;
-			os << p << "  total simplex count:     "
+			os << p << "  total column count:    "
 			   << info.simplex_total_count << std::endl;
-			os << p << "  reduction simplex count: "
-			   << info.simplex_reduction_count << std::endl;
-			os << p << "  class count:             "
-			   << info.class_count << std::endl;
-			os << p << "  zero pers count:         "
-			   << info.zero_pers_count<< std::endl;
-			os << p << "  clearing count:          "
+			os << p << "  ... cleared:           "
 			   << info.clearing_count << std::endl;
-			os << p << "  emergent count:          "
+			os << p << "  ... emergent:          "
 			   << info.emergent_count << std::endl;
-			os << p << "  apparent count:          "
+			os << p << "  ... apparent:          "
 			   << info.apparent_count << std::endl;
-			os << p << "  addition count:          "
+			os << p << "  total reduction count: "
+			   << info.simplex_reduction_count << std::endl;
+			os << p << "  ... non-zero:          "
+			   << info.class_count << std::endl;
+			os << p << "  ... zero:              "
+			   << info.zero_pers_count<< std::endl;
+			os << p << "  addition count:        "
 			   << info.addition_count << std::endl;
-			os << p << "  assemble duration:       "
+			os << p << "  total duration:        "
+			   << total_dur.count() << "s" << std::endl;
+			os << p << "  ... assembly:          "
 			   << info.assemble_dur.count() << "s" << std::endl;
-			os << p << "  reduction duration:      "
+			os << p << "  ... reduction:         "
 			   << info.reduction_dur.count() << "s" << std::endl;
-			os << p << "  representative duration: "
+			os << p << "  ... representative:    "
 			   << info.representative_dur.count() << "s" << std::endl;
 			if(&info != &ripser.infos.back()) {
 				os << std::endl;
