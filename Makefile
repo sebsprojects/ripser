@@ -13,10 +13,15 @@ ripser_hom_clearing_optimized: ripser_hom_clearing_optimized.cpp
 ripser_cohom_rephom: ripser_cohom_rephom.cpp
 	c++ -std=c++11 -Wall ripser_cohom_rephom.cpp -o ripser_cohom_rephom -g
 
+ripser_cohom_repinverse: ripser_cohom_repinverse.cpp
+	c++ -std=c++11 -Wall ripser_cohom_repinverse.cpp -o ripser_cohom_repinverse -g
+
+
 clean:
 	rm -f \
 ripser_hom \
 ripser_hom_optimized \
 ripser_hom_clearing \
 ripser_hom_clearing_optimized \
-ripser_cohom_rephom
+ripser_cohom_rephom \
+ripser_cohom_repinverse

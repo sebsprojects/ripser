@@ -159,6 +159,7 @@ void compute_cohomology(ripser &ripser,
 		}
 		//ripser.complete_reduction_record(dim, get_time(), add_count, app_count, -1);
 		// Determine Persistence Pair
+		// Note: We do need zero-persistence indices as well!
 		if(get_index(pivot) != -1) {
 			non_essential_indices.push_back(pivot);
 		} else {
@@ -232,13 +233,13 @@ void compute_homology(ripser &ripser,
 					e = pop_pivot(R_j);
 				}
 				ripser.add_hom_class(dim - 1, pivot, sigma_j, R_rep);
-				ripser.infos.at(dim).class_count++;
+				//ripser.infos.at(dim).class_count++;
 			} else {
-				ripser.infos.at(dim).zero_pers_count++;
+				//ripser.infos.at(dim).zero_pers_count++;
 			}
 		} else {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
-			ripser.infos.at(dim).class_count++;
+			//ripser.infos.at(dim).class_count++;
 		}
 	}
 	//ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
@@ -261,10 +262,10 @@ void compute_barcodes(ripser& ripser) {
 	ripser.infos.at(0).simplex_reduction_count = simplices.size();
 	index_t dim_max = std::min(ripser.config.dim_max, (int) ripser.n - 1);
 	// cohom in dim=0
-	for(index_t dim = 0; dim <= dim_max; ++dim) {
+	for(index_t dim = 0; dim <= dim_max + 1; ++dim) {
 		if(dim == 0) {
 			columns_to_reduce = simplices;
-		} else {
+		} else if (dim <= dim_max) {
 			columns_to_reduce.clear();
 			assemble_columns_to_reduce(ripser,
 			                           simplices,
@@ -276,12 +277,14 @@ void compute_barcodes(ripser& ripser) {
 		non_essential_indices_dimm1.swap(non_essential_indices_dim);
 		essential_indices.clear();
 		non_essential_indices_dim.clear();
-		compute_cohomology(ripser,
-		                   columns_to_reduce,
-		                   pivot_column_index,
-		                   dim,
-		                   essential_indices,
-		                   non_essential_indices_dim);
+		if(dim <= dim_max) {
+			compute_cohomology(ripser,
+		                       columns_to_reduce,
+		                       pivot_column_index,
+		                       dim,
+		                       essential_indices,
+		                       non_essential_indices_dim);
+		}
 		columns_to_reduce.clear();
 		columns_to_reduce = essential_indices;
 		columns_to_reduce.insert(columns_to_reduce.end(),
@@ -294,10 +297,12 @@ void compute_barcodes(ripser& ripser) {
 		std::cout << "--" << std::endl;
 		boundary_pivot_column_index.clear();
 		//boundary_pivot_column_index.reserve(boundary_columns_to_reduce.size());
+		time_point rep_start = get_time();
 		compute_homology(ripser,
 		                 columns_to_reduce,
 		                 boundary_pivot_column_index,
 		                 dim);
+		//ripser.infos.at(dim).representative_dur = get_duration(rep_start, get_time());
 	}
 }
 
@@ -319,7 +324,7 @@ int main(int argc, char** argv) {
 	output_config(ripser, std::cout); std::cout << std::endl;
 	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
-	output_barcode(ripser, std::cout, false); std::cout << std::endl;
+	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, false);
 	exit(0);
