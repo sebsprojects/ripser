@@ -26,7 +26,8 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			if(check_for_emergent_pair &&
 			   (get_diameter(simplex) == get_diameter(cofacet)) &&
 			   (pivot_column_index.find(get_index(cofacet)) == pivot_column_index.end()) &&
-			   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1))
+			   //(get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1))
+			   true)
 			{
 				ripser.infos.at(dim).emergent_count++;
 				return cofacet;
@@ -60,11 +61,11 @@ void assemble_columns_to_reduce(ripser &ripser,
 				if(pivot_column_index.find(get_index(cofacet)) ==
 				   pivot_column_index.end()) {
 					// Apparent Pair check
-					if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
+					//if(!is_in_zero_apparent_pair(ripser, cofacet, dim)) {
 						columns_to_reduce.push_back(cofacet);
-					} else {
-						ripser.infos.at(dim).apparent_count++;
-					}
+					//} else {
+					//	ripser.infos.at(dim).apparent_count++;
+					//}
 				} else {
 					cleared_columns.push_back(cofacet);
 					ripser.infos.at(dim).clearing_count++;
@@ -115,18 +116,18 @@ void compute_pairs(ripser &ripser,
 				ripser.infos.at(dim).addition_count++;
 				pivot = get_pivot(R_j);
 			} else {
-				index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
-				if(get_index(e) != -1) {
-					add_simplex_coboundary(ripser,
-					                       e,
-					                       dim,
-					                       V_j,
-					                       R_j);
-					pivot = get_pivot(R_j);
-				} else {
+				//index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
+				//if(get_index(e) != -1) {
+				//	add_simplex_coboundary(ripser,
+				//	                       e,
+				//	                       dim,
+				//	                       V_j,
+				//	                       R_j);
+				//	pivot = get_pivot(R_j);
+				//} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
-				}
+				//}
 			}
 		}
 		// Write V_j to V
@@ -190,7 +191,7 @@ void compute_reps(ripser& ripser,
 	index_t ctr_index = 0; // columns_to_reduce
 	index_diameter_t current_simplex(-1, -1); // current iteration simplex
 	index_diameter_t min_simplex(-1, -1); // minimum considered simplex
-	Column Vt_row;
+	Column P_j;
 	while(ctr_index < (index_t) columns_to_reduce.size() ||
 	      cc_index < (index_t) cleared_columns.size())
 	{
@@ -202,9 +203,9 @@ void compute_reps(ripser& ripser,
 			// Case V column: Assemble V
 			current_simplex = columns_to_reduce.at(ctr_index);
 			if(!active_hom_classes.empty()) {
-				Vt_row = Column();
+				P_j = Column();
 				// Add diagonal entry
-				Vt_row.push(current_simplex);
+				P_j.push(current_simplex);
 				// Add remaining entries if they exist
 				//std::cout << " :: cs=" << get_index(current_simplex) << std::flush;
 				if(V_dim.column_start(ctr_index) != V_dim.column_end(ctr_index)) {
@@ -214,11 +215,11 @@ void compute_reps(ripser& ripser,
 					{
 						index_diameter_t v_ele = V_dim.get_entry(l);
 						if(!reverse_filtration_order(v_ele, min_simplex)) {
-							Vt_row.push(v_ele);
+							P_j.push(v_ele);
 						}
 					}
 				}
-				//std::cout << " (" << ctr_index << ") :: V=" << Vt_row.size() << std::flush;
+				//std::cout << " (" << ctr_index << ") :: V=" << P_j.size() << std::flush;
 			} else {
 				//std::cout << " :: no hom class" << std::flush;
 			}
@@ -227,7 +228,7 @@ void compute_reps(ripser& ripser,
 			// Case V column cleared:
 			current_simplex = cleared_columns.at(cc_index);
 			if(!active_hom_classes.empty()) {
-				Vt_row = Column();
+				P_j = Column();
 				auto pair = pivot_column_index_dimm1.find(get_index(current_simplex));
 				if(pair != pivot_column_index_dimm1.end()) {
 					index_t pivot_index = pair->second;
@@ -235,7 +236,7 @@ void compute_reps(ripser& ripser,
 					add_partial_simplex_coboundary(ripser,
 					                               columns_to_reduce_dimm1.at(pivot_index),
 					                               min_simplex,
-					                               Vt_row,
+					                               P_j,
 					                               dim - 1);
 					// Add remaining entries
 					//std::cout << " :: cs=" << get_index(current_simplex) << std::flush;
@@ -245,10 +246,10 @@ void compute_reps(ripser& ripser,
 							l--)
 						{
 							index_diameter_t v_ele = V_dimm1.get_entry(l);
-							add_partial_simplex_coboundary(ripser, v_ele, min_simplex, Vt_row, dim - 1);
+							add_partial_simplex_coboundary(ripser, v_ele, min_simplex, P_j, dim - 1);
 						}
 					}
-					//std::cout << " (" << cc_index << ") :: R=" << Vt_row.size() << std::flush;
+					//std::cout << " (" << cc_index << ") :: R=" << P_j.size() << std::flush;
 				} else {
 				}
 			} else {
@@ -258,29 +259,31 @@ void compute_reps(ripser& ripser,
 		}
 		// COMPUTE PRODUCT
 		index_t num_pops = 0;
-		index_diameter_t v_ele = pop_pivot(Vt_row);
-		while(get_index(v_ele) != -1) {
-			for(index_t k = 0; k < (index_t) active_hom_classes.size(); k++) {
-				std::vector<index_diameter_t>& rep = hom_classes[active_hom_classes[k]].representative;
-				// Still elements in rep left to work with?
-				index_t rep_index = ((index_t) rep.size()) - 1 - hom_offs[k];
-				while(rep_index >= 0) {
-					index_diameter_t rep_ele = rep[rep_index];
-					// check if !(v_ele < rep_ele) equal to (rep_ele >= v_ele)
-					if(!reverse_filtration_order(v_ele, rep_ele)) {
-						if(rep_ele == v_ele) {
-							hom_parities[k] += 1;
+		index_diameter_t v_ele = pop_pivot(P_j);
+		if(get_index(v_ele) != -1) {
+			while(get_index(v_ele) != -1) {
+				for(index_t k = 0; k < (index_t) active_hom_classes.size(); k++) {
+					std::vector<index_diameter_t>& rep = hom_classes[active_hom_classes[k]].representative;
+					// Still elements in rep left to work with?
+					index_t rep_index = ((index_t) rep.size()) - 1 - hom_offs[k];
+					while(rep_index >= 0) {
+						index_diameter_t rep_ele = rep[rep_index];
+						// check if !(v_ele < rep_ele) equal to (rep_ele >= v_ele)
+						if(!reverse_filtration_order(v_ele, rep_ele)) {
+							if(rep_ele == v_ele) {
+								hom_parities[k] += 1;
+							}
+							break;
+						} else {
+							// v_ele < rep_ele
+							hom_offs[k] += 1;
+							rep_index--;
 						}
-						break;
-					} else {
-						// v_ele < rep_ele
-						//hom_offs[k] += 1;
-						rep_index--;
 					}
 				}
+				v_ele = pop_pivot(P_j);
+				num_pops++;
 			}
-			v_ele = pop_pivot(Vt_row);
-			num_pops++;
 		}
 		//std::cout << ":: np=" << num_pops << std::endl;
 		for(index_t k = 0; k < (index_t) active_hom_classes.size(); k++) {
