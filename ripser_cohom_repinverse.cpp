@@ -22,17 +22,19 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 		// Threshold check
 		if(get_diameter(cofacet) <= ripser.threshold) {
 			working_coboundary_buffer.push_back(cofacet);
-			// Emergent pair candidate check
+			// Emergent pair check
 			if(check_for_emergent_pair &&
-			   (get_diameter(simplex) == get_diameter(cofacet)) &&
-			   (pivot_column_index.find(get_index(cofacet)) == pivot_column_index.end()) &&
-			   //(get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1))
-			   true)
+			   (get_diameter(simplex) == get_diameter(cofacet)))
 			{
-				ripser.infos.at(dim).emergent_count++;
-				return cofacet;
+				if((pivot_column_index.find(get_index(cofacet)) ==
+				    pivot_column_index.end()) &&
+				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) 
+				{
+					ripser.infos.at(dim).emergent_count++;
+					return cofacet;
+				}
+				check_for_emergent_pair = false;
 			}
-			check_for_emergent_pair = false;
 		}
 	}
 	for(index_diameter_t cofacet : working_coboundary_buffer) {

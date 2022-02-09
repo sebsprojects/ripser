@@ -246,9 +246,25 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 
 void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=false)
 {
+	duration total_assemble_dur;
+	duration total_reduction_dur;
+	duration total_representative_dur;
+	index_t total_reduction_count = 0;
+	index_t total_clearing_count = 0;
+	index_t total_emergent_count = 0;
+	index_t total_apparent_count = 0;
+	index_t total_addition_count = 0;
 	for(info& info : ripser.infos) {
 		std::string p = pref ? ("#i" + std::to_string(info.dim) + " ") : "";
 		if(dim == -1 || info.dim == dim) {
+			total_assemble_dur += info.assemble_dur;
+			total_reduction_dur += info.reduction_dur;
+			total_representative_dur += info.representative_dur;
+			total_reduction_count += info.addition_count;
+			total_clearing_count += info.clearing_count;
+			total_emergent_count += info.emergent_count;
+			total_apparent_count += info.apparent_count;
+			total_addition_count += info.addition_count;
 			duration total_dur = info.assemble_dur + info.reduction_dur + info.representative_dur;
 			os << (pref ? "# " : "") << "reduction info in dim=" << info.dim << ":"
 			   << std::endl;
@@ -275,12 +291,21 @@ void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=fal
 			os << p << "  ... reduction:         "
 			   << info.reduction_dur.count() << "s" << std::endl;
 			os << p << "  ... representative:    "
-			   << info.representative_dur.count() << "s" << std::endl;
-			if(&info != &ripser.infos.back()) {
-				os << std::endl;
-			}
+			   << info.representative_dur.count() << "s" << std::endl << std::endl;
 		}
 	}
+	std::string p = (pref ? "# " : "");
+	os << p << "total durations:" << std::endl;
+	os << p << "  assembly:       " << total_assemble_dur.count() << std::endl;
+	os << p << "  reduction:      " << total_reduction_dur.count() << std::endl;
+	os << p << "  representative: " << total_representative_dur.count() << std::endl;
+	os << p << "total counts:" << std::endl;
+	os << p << "  cleared:   " << total_clearing_count << std::endl;
+	os << p << "  emergent:  " << total_emergent_count << std::endl;
+	os << p << "  apparent:  " << total_apparent_count << std::endl;
+	os << p << "  reduction: " << total_reduction_count << std::endl;
+	os << p << "  addition:  " << total_addition_count << std::endl;
+
 }
 
 void output_config(ripser& ripser, std::ostream& os, bool pref=false) {

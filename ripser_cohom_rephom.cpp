@@ -31,13 +31,17 @@ index_diameter_t cohom_init_coboundary_and_get_pivot(ripser &ripser,
 			working_coboundary_buffer.push_back(cofacet);
 			// Emergent pair check
 			if(check_for_emergent_pair &&
-			   (get_diameter(simplex) == get_diameter(cofacet)) &&
-			   (pivot_column_index.find(get_index(cofacet)) == pivot_column_index.end()) &&
-			   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) {
+			   (get_diameter(simplex) == get_diameter(cofacet)))
+			{
+				if((pivot_column_index.find(get_index(cofacet)) ==
+				    pivot_column_index.end()) &&
+				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) 
+				{
 					ripser.infos.at(dim).emergent_count++;
 					return cofacet;
 				}
-			check_for_emergent_pair = false;
+				check_for_emergent_pair = false;
+			}
 		}
 	}
 	for(index_diameter_t cofacet : working_coboundary_buffer) {

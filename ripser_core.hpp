@@ -604,10 +604,8 @@ struct ripser {
 		rec.addition_apparent_count = add_app_count;
 		rec.coboundary_element_count = coboundary_count;
 		if(config.print_progress) {
-			if(dim > curr_dim) {
-				if(curr_dim >= 0) {
-					std::cout << std::endl;
-				}
+			if(dim != curr_dim) {
+				std::cout << std::endl;
 				std::cout << "reduction progress in dim=" << dim << std::endl;
 				curr_dim = dim;
 				thresh_counter = -1;

@@ -157,11 +157,11 @@ void compute_barcodes(ripser& ripser) {
 	std::vector<index_diameter_t> simplices;
 	std::vector<index_diameter_t> columns_to_reduce;
 	time_point assemble_start = get_time();
-	assemble_all_simplices(ripser, simplices, 0);
-	std::sort(simplices.begin(), simplices.end(), filtration_order);
+	assemble_all_simplices(ripser, simplices, columns_to_reduce, 0);
+	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), filtration_order);
 	ripser.infos.at(0).assemble_dur = get_duration(assemble_start, get_time());
-	ripser.infos.at(0).simplex_total_count = ripser.n;
-	ripser.infos.at(0).simplex_reduction_count = ripser.n;
+	ripser.infos.at(0).simplex_total_count = simplices.size();
+	ripser.infos.at(0).simplex_reduction_count = columns_to_reduce.size();
 	index_t dim_max = std::min(ripser.config.dim_max, (int) ripser.n - 1);
 	for(index_t dim = 0; dim <= dim_max; dim++) {
 		if(dim == 0) {
