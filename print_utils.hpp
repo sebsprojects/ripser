@@ -224,7 +224,7 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 				os << ", )";
 			} else {
 				// TODO: Dimension needs to be switch to +1 (homology) or -1 (cohomology)
-				os << "," << simplex_tos(ripser, hc.death, d + 1, 0, 1, 1, 0, 0)
+				os << "," << simplex_tos(ripser, hc.death, d - 1, 0, 1, 1, 0, 0)
 				   << ")";
 			}
 			if(with_reps) {
