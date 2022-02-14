@@ -24,7 +24,7 @@ index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
 			working_boundary.push(facet);
 		}
 	}
-	return get_pivot(working_boundary);
+	return get_pivot(ripser, working_boundary);
 }
 
 void assemble_columns_to_reduce(ripser &ripser,
@@ -78,6 +78,7 @@ void compute_pairs(ripser &ripser,
 	compressed_sparse_matrix V;
 	entry_hash_map pivot_column_index;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+		ripser.add_reduction_record(dim, j, get_time());
 		V.append_column();
 		Column R_j;
 		Column V_j;
@@ -87,6 +88,7 @@ void compute_pairs(ripser &ripser,
 		                                                     dim,
 		                                                     R_j);
 		// The reduction
+		index_t add_count = 0;
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
@@ -98,7 +100,8 @@ void compute_pairs(ripser &ripser,
 				             dim,
 				             V_j,
 				             R_j);
-				pivot = get_pivot(R_j);
+				pivot = get_pivot(ripser, R_j);
+				add_count++;
 				ripser.infos.at(dim).addition_count++;
 			} else {
 				pivot_column_index.insert({get_index(pivot), j});
@@ -108,19 +111,20 @@ void compute_pairs(ripser &ripser,
 		// Write V_j to V
 		std::vector<index_diameter_t> V_rep;
 		V_rep.push_back(sigma_j);
-		index_diameter_t e = pop_pivot(V_j);
+		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
 			V.push_back(e);
 			V_rep.push_back(e);
-			e = pop_pivot(V_j);
+			e = pop_pivot(ripser, V_j);
 		}
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
+			ripser.get_current_reduction_record().to_zero = false;
 			std::vector<index_diameter_t> R_rep;
-			e = pop_pivot(R_j);
+			e = pop_pivot(ripser, R_j);
 			while(get_index(e) != -1) {
 				R_rep.push_back(e);
-				e = pop_pivot(R_j);
+				e = pop_pivot(ripser, R_j);
 			}
 			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
 		} else if(dim == ripser.n - 1 || dim < ripser.config.dim_max) {
@@ -168,6 +172,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, true);
+	write_standard_output(ripser, true, false);
+	//write_analysis_rr(ripser, "_hom");
 	exit(0);
 }

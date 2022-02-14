@@ -431,16 +431,12 @@ struct reduction_record {
 	index_t addition_apparent_count;
 	index_t coboundary_element_count;
 
-	bool to_zero;
-
 	index_t add_simplex_boundary_count;
-	index_t pop_count;
-	index_t push_count;
+	index_t pivot_pop;
 
 	reduction_record(index_t _j, time_point _start)
-		: j(_j), start(_start), end(), addition_count(0), addition_apparent_count(0),
-		  coboundary_element_count(0), to_zero(true), add_simplex_boundary_count(0),
-		  pop_count(0), push_count(0)
+		: j(_j), start(_start), end(), addition_count(), addition_apparent_count(),
+		  coboundary_element_count()
 	{
 	}
 };
@@ -488,7 +484,6 @@ struct ripser {
 	mutable value_t threshold;
 	mutable std::vector<std::vector<homology_class>> hom_classes;
 	mutable std::vector<info> infos;
-	mutable index_t current_reduction_record_dim;
 
 	ripser(ripser_config _config)
 		: dist(read_input(_config)),
@@ -497,8 +492,7 @@ struct ripser {
 		  config(_config),
 		  threshold(-1),
 		  hom_classes(),
-		  infos(),
-		  current_reduction_record_dim(-1)
+		  infos()
 	{
 		if(config.use_enclosing_threshold) {
 			threshold = compute_enclosing_radius(dist);
@@ -598,24 +592,22 @@ struct ripser {
 		hom_classes.at(dim).push_back(homology_class(dim, birth, death, rep));
 	}
 
-	reduction_record& get_current_reduction_record() {
-		return infos.at(current_reduction_record_dim).red_records.back();
+	reduction_record& get_current_reduction_record(dim) {
+		return infos.at(dim).red_records.back();
 	}
 
 	void add_reduction_record(index_t dim, index_t j, time_point start) {
 		infos.at(dim).red_records.push_back(reduction_record(j, start));
-		current_reduction_record_dim = dim;
 	}
 
-	void complete_reduction_record(time_point end,
+	void complete_reduction_record(index_t dim, time_point end,
 	                               index_t add_count,
 	                               index_t add_app_count,
 	                               index_t coboundary_count) {
 		//TODO(seb): hacky hacky hacky output handling
-		index_t dim = current_reduction_record_dim;
 		static index_t thresh_counter = -1;
 		static index_t curr_dim = -1;
-		static index_t thresh_lim = 0;
+		static index_t thresh_lim = 10;
 		static index_t thresh_linelim = 50;
 		reduction_record& rec = infos.at(dim).red_records.back();
 		rec.end = end;
@@ -649,15 +641,11 @@ struct ripser {
 				std::cout << "  "
 						  << (rec.j+1) << "/"
 						  << infos.at(dim).simplex_reduction_count;
-				//std::cout << " :: tim=(" << std::setw(6) << ms << "ms)"
-				//		  << " :: add=(" << std::setw(5) << add_count << "/"
-				//		  << std::setw(5) << add_app_count << ")"
-				//		  << " :: cob=" << std::setw(4) << coboundary_count
-				//		  << std::endl;
-				std::cout << (rec.to_zero ? " z=YES" : " z=NO ")
-				          << " :: add=" << std::setw(3) << rec.add_simplex_boundary_count
-				          << " :: push=" << std::setw(3) << rec.push_count
-						  << " :: pop=" << std::setw(3) << rec.pop_count << std::endl;
+				std::cout << " :: tim=(" << std::setw(6) << ms << "ms)"
+						  << " :: add=(" << std::setw(5) << add_count << "/"
+						  << std::setw(5) << add_app_count << ")"
+						  << " :: cob=" << std::setw(4) << coboundary_count
+						  << std::endl;
 				thresh_counter = -1;
 			}
 		}
@@ -811,11 +799,10 @@ void assemble_all_simplices(ripser& ripser,
 // i.e. the largest simplex that does not cancel out
 // If and only if the column is zero, return (-1, -1)
 template <typename Column>
-index_diameter_t pop_pivot(ripser& ripser, Column& column) {
+index_diameter_t pop_pivot(Column& column) {
 	index_diameter_t pivot(-1, -1);
 	while(!column.empty()) {
 		pivot = column.top();
-		ripser.get_current_reduction_record().pop_count++;
 		column.pop();
 		if(column.empty()) {
 			return pivot;
@@ -823,9 +810,8 @@ index_diameter_t pop_pivot(ripser& ripser, Column& column) {
 		if(get_index(column.top()) != get_index(pivot)) { // different index on top
 			return pivot;
 		} else { // same index on top
-			// The same row index appears twice, they sum up to 0 (in F2), continue
-			ripser.get_current_reduction_record().pop_count++;
-			column.pop();
+		  // The same row index appears twice, they sum up to 0 (in F2), continue
+		  column.pop();
 		}
 	}
 	return index_diameter_t(-1, -1);
@@ -834,10 +820,9 @@ index_diameter_t pop_pivot(ripser& ripser, Column& column) {
 // Note: May reduce to size of column by popping 'canceling' pivots but only
 // replacing one
 template <typename Column>
-index_diameter_t get_pivot(ripser& ripser, Column& column) {
-	index_diameter_t pivot = pop_pivot(ripser, column);
+index_diameter_t get_pivot(Column& column) {
+	index_diameter_t pivot = pop_pivot(column);
 	if(get_index(pivot) != -1) {
-		ripser.get_current_reduction_record().push_count++;
 		column.push(pivot); // push back the popped pivot
 	}
 	return pivot;
@@ -858,7 +843,6 @@ void add_simplex_coboundary(ripser& ripser,
 		index_diameter_t cofacet = cofacets.next();
 		// Threshold check
 		if(get_diameter(cofacet) <= ripser.threshold) {
-			ripser.get_current_reduction_record().push_count++;
 			working_coboundary.push(cofacet);
 		}
 	}
@@ -874,7 +858,6 @@ void add_coboundary(ripser& ripser,
                     Column& working_coboundary) {
 	//TODO(seb): Do we need the correct diameter here?
 	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add));
-	ripser.get_current_reduction_record().add_simplex_boundary_count++;
 	add_simplex_coboundary(ripser,
 	                       column_to_add,
 	                       dim,
@@ -885,7 +868,6 @@ void add_coboundary(ripser& ripser,
 	    i < reduction_matrix.column_end(index_column_to_add);
 	    ++i) {
 		index_diameter_t simplex = reduction_matrix.get_entry(i);
-		ripser.get_current_reduction_record().add_simplex_boundary_count++;
 		add_simplex_coboundary(ripser,
 		                       simplex,
 		                       dim,
@@ -905,9 +887,8 @@ void add_simplex_boundary(ripser &ripser,
 	facets.set_simplex(simplex, dim);
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
-		// Threshold check
 		if(get_diameter(facet) <= ripser.threshold) {
-			ripser.get_current_reduction_record().push_count++;
+			ripser.get_current_reduction_record(dim).push_count++;
 			working_boundary.push(facet);
 		}
 	}
@@ -924,18 +905,17 @@ void add_boundary(ripser& ripser,
 	//TODO(seb): Do we need the correct diameter here?
 	index_diameter_t column_to_add(columns_to_reduce.at(index_column_to_add));
 	// Computation of R_j due to implicit reduction
-	ripser.get_current_reduction_record().add_simplex_boundary_count++;
 	add_simplex_boundary(ripser,
 	                     column_to_add,
 	                     dim,
 	                     working_reduction_column,
 	                     working_boundary);
+
+	ripser.get_current_reduction_record(dim).add_simplex_boundary_count++;
 	for(index_t i = reduction_matrix.column_start(index_column_to_add);
 	    i < reduction_matrix.column_end(index_column_to_add);
-	    ++i)
-	{
+	    ++i) {
 		index_diameter_t simplex = reduction_matrix.get_entry(i);
-		ripser.get_current_reduction_record().add_simplex_boundary_count++;
 		add_simplex_boundary(ripser,
 		                     simplex,
 		                     dim,

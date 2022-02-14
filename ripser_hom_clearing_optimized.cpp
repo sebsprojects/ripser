@@ -44,7 +44,7 @@ index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
 	for(index_diameter_t facet : working_boundary_buffer) {
 		working_boundary.push(facet);
 	}
-	return get_pivot(working_boundary);
+	return get_pivot(ripser, working_boundary);
 }
 
 void assemble_columns_to_reduce(ripser &ripser,
@@ -121,7 +121,8 @@ void compute_pairs(ripser &ripser,
 				             V_j,
 				             R_j);
 				ripser.infos.at(dim).addition_count++;
-				pivot = get_pivot(R_j);
+				add_count++;
+				pivot = get_pivot(ripser, R_j);
 			} else {
 				index_diameter_t e = get_zero_apparent_cofacet(ripser, pivot, dim - 1);
 				if(get_index(e) != -1) {
@@ -130,7 +131,8 @@ void compute_pairs(ripser &ripser,
 					                     dim,
 					                     V_j,
 					                     R_j);
-					pivot = get_pivot(R_j);
+					app_count++;
+					pivot = get_pivot(ripser, R_j);
 				} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
@@ -141,22 +143,22 @@ void compute_pairs(ripser &ripser,
 		std::vector<index_diameter_t> V_rep;
 		std::vector<index_diameter_t> R_rep;
 		V_rep.push_back(sigma_j);
-		index_diameter_t e = pop_pivot(V_j);
+		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
 			V.push_back(e);
 			V_rep.push_back(e);
-			e = pop_pivot(V_j);
+			e = pop_pivot(ripser, V_j);
 		}
-		ripser.complete_reduction_record(dim, get_time(), add_count, app_count, -1);
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
+			ripser.get_current_reduction_record().to_zero = false;
 			value_t birth = std::max(0.0f, get_diameter(pivot));
 			if(get_diameter(sigma_j) > birth * ripser.config.ratio) {
-				e = pop_pivot(R_j);
-				while(get_index(e) != -1) {
-					R_rep.push_back(e);
-					e = pop_pivot(R_j);
-				}
+				//e = pop_pivot(R_j);
+				//while(get_index(e) != -1) {
+				//	R_rep.push_back(e);
+				//	e = pop_pivot(R_j);
+				//}
 				ripser.add_hom_class(dim - 1, pivot, sigma_j, R_rep);
 				ripser.infos.at(dim).class_count++;
 			} else {
@@ -166,6 +168,7 @@ void compute_pairs(ripser &ripser,
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
 			ripser.infos.at(dim).class_count++;
 		}
+		ripser.complete_reduction_record(get_time(), add_count, app_count, -1);
 	}
 	ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
 }
@@ -243,5 +246,6 @@ int main(int argc, char** argv) {
 	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, false);
+	write_analysis_rr(ripser, "_hom_clearing_opt");
 	exit(0);
 }

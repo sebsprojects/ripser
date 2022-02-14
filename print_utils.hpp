@@ -206,8 +206,9 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 		if(!(dim == -1 || d == dim)) {
 			continue;
 		}
+		// TODO: This sorts by print order instead of homology order
 		std::sort(ripser.hom_classes.at(d).begin(), ripser.hom_classes.at(d).end(),
-		          homology_class_print_order);
+		          homology_class_order);
 		std::string p = pref ? ("#b" + std::to_string(d) + " ") : "";
 		os << (pref ? "# " : "") << "barcode in dim=" << d << std::endl;
 		for(auto& hc : ripser.hom_classes.at(d)) {
@@ -224,7 +225,7 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 				os << ", )";
 			} else {
 				// TODO: Dimension needs to be switch to +1 (homology) or -1 (cohomology)
-				os << "," << simplex_tos(ripser, hc.death, d - 1, 0, 1, 1, 0, 0)
+				os << "," << simplex_tos(ripser, hc.death, d + 1, 0, 1, 1, 0, 0)
 				   << ")";
 			}
 			if(with_reps) {
@@ -366,7 +367,7 @@ void output_config(ripser& ripser, std::ostream& os, bool pref=false) {
 	os << std::endl;
 }
 
-std::ofstream get_writeout_stream(ripser& ripser) {
+std::ofstream get_writeout_stream(ripser& ripser, std::string suffix="") {
 	std::string ip = ripser.config.input_path;
 	std::string dataset_name = ip.substr(ip.find_last_of("/\\") + 1);
 	std::stringstream ss;
@@ -405,7 +406,7 @@ std::ofstream get_writeout_stream(ripser& ripser) {
 			}
 		}
 	}
-	ss << ".txt";
+	ss << suffix << ".txt";
 	std::cout << ss.str() << std::endl;
 	return std::ofstream(ss.str(), std::ofstream::trunc);
 }
@@ -422,6 +423,24 @@ void write_standard_output(ripser& ripser,
 	}
 	output_info(ripser, ofs, -1, true); ofs << std::endl;
 	output_barcode(ripser, ofs, with_reps, -1, true); ofs << std::endl;
+}
+
+void output_reduction_record(std::ostream& os, index_t dim, reduction_record& rr) {
+	os << std::setw(2) << dim << " ; "
+	   << std::setw(5) << rr.j << " ; "
+	   << rr.to_zero << " ; "
+	   << std::setw(5) << rr.add_simplex_boundary_count << " ; "
+	   << std::setw(7) << rr.pop_count << " ; "
+	   << std::setw(7) << rr.push_count << std::endl;
+}
+
+void write_analysis_rr(ripser& ripser, std::string suffix="") {
+	std::ofstream ofs = get_writeout_stream(ripser, "_rr" + suffix);
+	for(info& info : ripser.infos) {
+		for(reduction_record& rr : info.red_records) {
+			output_reduction_record(ofs, info.dim, rr);
+		}
+	}
 }
 
 #endif
