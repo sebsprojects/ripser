@@ -508,7 +508,7 @@ struct ripser {
 		} else {
 			threshold = config.config_threshold;
 		}
-		for(index_t i = 0; i <= config.dim_max; ++i) {
+		for(index_t i = 0; i <= config.dim_max + 1; ++i) {
 			infos.push_back(info(i));
 			hom_classes.push_back(std::vector<homology_class>());
 		}

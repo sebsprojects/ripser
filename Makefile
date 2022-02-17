@@ -28,6 +28,9 @@ ripser_cohom_repinverse: ripser_cohom_repinverse.cpp
 ripser_cohom_rel: ripser_cohom_rel.cpp
 	c++ -std=c++11 -Wall ripser_cohom_rel.cpp -o ripser_cohom_rel -g
 
+ripser_cohom_rel_optimized: ripser_cohom_rel_optimized.cpp
+	c++ -std=c++11 -Wall ripser_cohom_rel_optimized.cpp -o ripser_cohom_rel_optimized -g
+
 ripser_cohom_relrephom: ripser_cohom_relrephom.cpp
 	c++ -std=c++11 -Wall ripser_cohom_relrephom.cpp -o ripser_cohom_relrephom -g
 
@@ -38,6 +41,12 @@ ripsero3_cohom_clearing_optimized: ripser_cohom_clearing_optimized.cpp
 
 ripsero3_hom_clearing_optimized: ripser_hom_clearing_optimized.cpp
 	c++ -std=c++11 -Wall ripser_hom_clearing_optimized.cpp -o ripsero3_hom_clearing_optimized -O3
+
+ripsero3_cohom_rel: ripser_cohom_rel.cpp
+	c++ -std=c++11 -Wall ripser_cohom_rel.cpp -o ripsero3_cohom_rel -O3
+
+ripsero3_cohom_rel_optimized: ripser_cohom_rel_optimized.cpp
+	c++ -std=c++11 -Wall ripser_cohom_rel_optimized.cpp -o ripsero3_cohom_rel_optimized -O3
 
 # Misc versions
 

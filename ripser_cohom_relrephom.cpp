@@ -319,8 +319,8 @@ void compute_barcodes(ripser& ripser) {
 	assemble_all_simplices(ripser, columns_to_reduce, 0, true);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), reverse_filtration_order);
 	ripser.infos.at(0).assemble_dur = get_duration(assemble_start, get_time());
-	ripser.infos.at(0).simplex_total_count = simplices.size();
-	ripser.infos.at(0).simplex_reduction_count = simplices.size();
+	ripser.infos.at(0).simplex_total_count = columns_to_reduce.size();
+	ripser.infos.at(0).simplex_reduction_count = columns_to_reduce.size();
 	index_t dim_max = std::min(ripser.config.dim_max, (int) ripser.n - 1);
 	// cohom in dim=0
 	for(index_t dim = 0; dim <= dim_max + 1; ++dim) {

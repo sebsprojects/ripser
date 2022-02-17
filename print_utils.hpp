@@ -443,4 +443,31 @@ void write_analysis_rr(ripser& ripser, std::string suffix="") {
 	}
 }
 
+void write_short_rr(ripser& ripser, std::string suffix="") {
+	std::ofstream os = get_writeout_stream(ripser, "_rr" + suffix);
+	for(info& info : ripser.infos) {
+		index_t dim = info.dim;
+		index_t column_count = info.simplex_total_count;
+		index_t column_red_count = info.simplex_reduction_count;
+		index_t class_count = info.class_count;
+		index_t zero_count = info.zero_pers_count;
+		index_t push_count = 0;
+		index_t pop_count = 0;
+		index_t add_count = 0;
+		for(reduction_record& rr : info.red_records) {
+			push_count += rr.push_count;
+			pop_count += rr.pop_count;
+			add_count += rr.add_simplex_boundary_count;
+		}
+		std::string pref = "#r" + std::to_string(dim);
+		os << pref << " " << "col_count=" << column_count << std::endl;
+		os << pref << " " << "red_count=" << column_red_count << std::endl;
+		os << pref << " " << "class_count=" << class_count << std::endl;
+		os << pref << " " << "zero_count=" << zero_count << std::endl;
+		os << pref << " " << "push_count=" << push_count << std::endl;
+		os << pref << " " << "pop_count=" << pop_count << std::endl;
+		os << pref << " " << "add_count=" << add_count << std::endl << std::endl;
+	}
+}
+
 #endif

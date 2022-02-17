@@ -148,6 +148,9 @@ void compute_pairs(ripser &ripser,
 			value_t birth = get_diameter(pivot);
 			if(birth > death * ripser.config.ratio) {
 				ripser.add_hom_class(dim, sigma_j, pivot);
+				ripser.infos.at(dim).class_count++;
+			} else {
+				ripser.infos.at(dim).zero_pers_count++;
 			}
 		} else {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF));
@@ -205,6 +208,7 @@ int main(int argc, char** argv) {
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, false);
-	write_analysis_rr(ripser, "_cohom_clearing_opt");
+	//write_analysis_rr(ripser, "_cohom_clearing_opt");
+	write_short_rr(ripser, "abs");
 	exit(0);
 }

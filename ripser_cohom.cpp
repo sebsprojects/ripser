@@ -24,7 +24,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			working_coboundary.push(cofacet);
 		}
 	}
-	return get_pivot(working_coboundary);
+	return get_pivot(ripser, working_coboundary);
 }
 
 void assemble_columns_to_reduce(ripser &ripser,
@@ -89,6 +89,7 @@ void compute_pairs(ripser &ripser,
 	compressed_sparse_matrix V;
 	entry_hash_map pivot_column_index;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+		ripser.add_reduction_record(dim, j, get_time());
 		V.append_column();
 		Column R_j;
 		Column V_j;
@@ -98,6 +99,7 @@ void compute_pairs(ripser &ripser,
 		                                                       dim,
 		                                                       R_j);
 		// The reduction
+		index_t add_count;
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
@@ -109,7 +111,8 @@ void compute_pairs(ripser &ripser,
 				               dim,
 				               V_j,
 				               R_j);
-				pivot = get_pivot(R_j);
+				pivot = get_pivot(ripser, R_j);
+				add_count++;
 				ripser.infos.at(dim).addition_count++;
 			} else {
 				pivot_column_index.insert({get_index(pivot), j});
@@ -119,19 +122,21 @@ void compute_pairs(ripser &ripser,
 		// Write V_j to V
 		std::vector<index_diameter_t> V_rep;
 		V_rep.push_back(sigma_j);
-		index_diameter_t e = pop_pivot(V_j);
+		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
 			V.push_back(e);
 			V_rep.push_back(e);
-			e = pop_pivot(V_j);
+			e = pop_pivot(ripser, V_j);
 		}
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
+			ripser.get_current_reduction_record().to_zero = false;
 			update_hom_class(ripser, dim, pivot, sigma_j, V_rep);
 		} else {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
 			//ripser.infos.at(dim).class_count++;
 		}
+		ripser.complete_reduction_record(get_time(), add_count, 0, -1);
 	}
 }
 
@@ -170,7 +175,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, true, true);
+	//write_standard_output(ripser, true, true);
 	exit(0);
 }
 
