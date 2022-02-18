@@ -454,6 +454,9 @@ void write_short_rr(ripser& ripser, std::string suffix="") {
 		index_t push_count = 0;
 		index_t pop_count = 0;
 		index_t add_count = 0;
+		float app_count = (float) info.apparent_count / (float) column_count;
+		float cl_count = (float) info.clearing_count / (float) column_count;
+		float tim = info.reduction_dur.count();
 		for(reduction_record& rr : info.red_records) {
 			push_count += rr.push_count;
 			pop_count += rr.pop_count;
@@ -466,7 +469,10 @@ void write_short_rr(ripser& ripser, std::string suffix="") {
 		os << pref << " " << "zero_count=" << zero_count << std::endl;
 		os << pref << " " << "push_count=" << push_count << std::endl;
 		os << pref << " " << "pop_count=" << pop_count << std::endl;
-		os << pref << " " << "add_count=" << add_count << std::endl << std::endl;
+		os << pref << " " << "add_count=" << add_count << std::endl;
+		os << pref << " " << "app_count=" << app_count << std::endl;
+		os << pref << " " << "cl_count=" << cl_count << std::endl;
+		os << pref << " " << "time=" << tim << std::endl << std::endl;
 	}
 }
 

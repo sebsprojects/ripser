@@ -59,7 +59,6 @@ void assemble_columns_to_reduce(ripser &ripser,
 	std::vector<index_diameter_t> next_simplices;
 	simplex_coboundary_enumerator cofacets(ripser);
 	for(index_diameter_t& simplex : simplices) {
-		std::cout << "Enumerating for: " << get_index(simplex) << std::endl;
 		cofacets.set_simplex(simplex, dim - 1);
 		while(cofacets.has_next(false)) {
 			index_diameter_t cofacet = cofacets.next();
@@ -69,7 +68,6 @@ void assemble_columns_to_reduce(ripser &ripser,
 				// Relative check
 				if(!ripser.is_relative_simplex(get_index(cofacet), dim)) {
 					ripser.infos.at(dim).simplex_total_count++;
-					std::cout << get_index(cofacet) << " ";
 					// Clearing check
 					if(pivot_column_index.find(get_index(cofacet)) ==
 					   pivot_column_index.end())
@@ -81,7 +79,6 @@ void assemble_columns_to_reduce(ripser &ripser,
 				}
 			}
 		}
-		std::cout << std::endl;
 	}
 	simplices.swap(next_simplices);
 	std::sort(columns_to_reduce.begin(), columns_to_reduce.end(), reverse_filtration_order);

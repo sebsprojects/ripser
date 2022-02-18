@@ -1,17 +1,33 @@
 import subprocess
+import math
 
-rs = ["ripsero3_cohom_rel", "ripsero3_cohom_rel_optimized"]
+#config_file = "rel_test/random100"
+#n = 100
+#config_file = "rel_test/sphere192"
+#n = 192
+#config_file = "rel_test/o3_512"
+#n = 512
+#config_file = "rel_test/o3_256"
+#n = 256
+config_file = "rel_test/covid_landdistmat"
+n = 10000
+
+rs = ["ripsero3_cohom_rel_optimized"]
 rel_configs = ["relative_subcomplex="]
-for rel in [[0,i*10+9] for i in range(0, 9)]:
-    rel_configs.append("relative_subcomplex=" + str(rel[0]) + "-" + str(rel[1]))
+
+xs = [ 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.96, 0.97, 0.98, 0.99]
+
+for rel in xs:
+    rel_configs.append("relative_subcomplex=0-" + str(int(math.floor(n * rel)) - 1))
 
 for r in rs:
     for c in rel_configs:
-        config = open("rel_test/random100_part.ini", "r")
-        config_dest = open("rel_test/random100.ini", "w")
+        config = open(config_file + "_part.ini", "r")
+        config_dest = open(config_file + ".ini", "w")
         for l in config:
             config_dest.write(l)
         config_dest.write(c)
         config.close()
         config_dest.close()
-        output = subprocess.Popen(["./" + r, "rel_test/random100.ini"])
+        p = subprocess.Popen(["./" + r, config_file + ".ini"])
+        retval = p.wait()

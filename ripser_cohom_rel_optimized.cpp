@@ -106,8 +106,8 @@ void compute_pairs(ripser &ripser,
 		                                                       R_j,
 		                                                       pivot_column_index);
 		// The reduction
-		index_t add_count;
-		index_t app_count;
+		index_t add_count = 0;
+		index_t app_count = 0;
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {

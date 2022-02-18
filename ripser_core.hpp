@@ -251,12 +251,13 @@ compressed_lower_distance_matrix read_distance_matrix(ripser_config& config,
 	std::vector<value_t> distances;
 	std::string line;
 	value_t value;
+	int offs = config.input_type == "lower_distance_matrix" ? 0 : 1;
 	for(int i = 0; std::getline(input_stream, line); ++i) {
 		if(!is_absolute_index(config, i)) {
 			continue;
 		}
 		std::istringstream s(line);
-		for (int j = 0; j <= i; ++j) {
+		for (int j = 0; j < i + offs; ++j) {
 			s >> value;
 			if(!is_absolute_index(config, j)) {
 				continue;
@@ -427,15 +428,15 @@ struct reduction_record {
 	index_t j;
 	time_point start;
 	time_point end;
-	index_t addition_count;
-	index_t addition_apparent_count;
-	index_t coboundary_element_count;
+	long addition_count;
+	long addition_apparent_count;
+	long coboundary_element_count;
 
 	bool to_zero;
 
-	index_t add_simplex_boundary_count;
-	index_t pop_count;
-	index_t push_count;
+	long add_simplex_boundary_count;
+	long pop_count;
+	long push_count;
 
 	reduction_record(index_t _j, time_point _start)
 		: j(_j), start(_start), end(), addition_count(0), addition_apparent_count(0),
@@ -615,7 +616,7 @@ struct ripser {
 		index_t dim = current_reduction_record_dim;
 		static index_t thresh_counter = -1;
 		static index_t curr_dim = -1;
-		static index_t thresh_lim = 0;
+		static index_t thresh_lim = 50;
 		static index_t thresh_linelim = 50;
 		reduction_record& rec = infos.at(dim).red_records.back();
 		rec.end = end;
