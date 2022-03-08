@@ -1,16 +1,8 @@
-## Ripser's Core Functionality: ripser_core.hpp
+This branch of (my fork of) Ripser contains all implemenetations, configs, scripts and most data set developed and used as part of my master thesis project.
 
-[ripser_core.hpp](./ripser_core.hpp) contains infrastructure code that is used for all versions of the reduction algorithm. It contains key types and functions implementing
-- Data types,
-- The combinatoric numbering system,
-- Facet and cofacet enumeration,
-- Matrix operations required by the reduction algorithm,
-- Functionality for union-find, apparent pairs and relative (co)homology,
-- Input processing,
-- Output assembly and storage,
-- Performance metric collection.
+## Compile and Run
 
-Most code concerning the functionality of Ripser is very close to that of Ripser v.1.2.1. However, many functions have been separated from the `ripser` class and templates have been reduced to a minimum.
+All `ripser_*` source files can be compiled with `make`. See `Makefile` for all available builds. All versions are run as `./ripser_* path/to/config.ini`.
 
 ## Configuration: ripser_config.cpp
 
@@ -30,6 +22,21 @@ Instead of passing program parameters to Ripser directly, all versions expect a 
 Values of the type string must be unquoted. The type bool has values true, false (alternatively 1 and 0). Ranges are a comma-separated list of closed intervals specified by bounds (both bounds are included). For instance `0-99,200-299` specifies a 200 element range.
 
 The parameters `input_path`, `inpute_type` and `dim_max` must be specified. All other parameters are optional.
+
+## Ripser's Core Functionality: ripser_core.hpp
+
+[ripser_core.hpp](./ripser_core.hpp) contains infrastructure code that is used for all versions of the reduction algorithm. It contains key types and functions implementing
+- Data types,
+- The combinatoric numbering system,
+- Facet and cofacet enumeration,
+- Matrix operations required by the reduction algorithm,
+- Functionality for union-find, apparent pairs and relative (co)homology,
+- Input processing,
+- Output assembly and storage,
+- Performance metric collection.
+
+Most code concerning the functionality of Ripser is very close to that of Ripser v.1.2.1. However, many functions have been separated from the `ripser` class and templates have been reduced to a minimum.
+
 
 ## Reduction Algorithm: ripser_*.cpp
 
@@ -65,4 +72,4 @@ All of the following versions implement a degreewise reduction, either in increa
 
 ## License
 
-This fork of Ripser is licensed under the [MIT] license (`COPYING.txt`), with an extra clause (`CONTRIBUTING.txt`) clarifying the license for modifications released without an explicit written license agreement. Please contact the author if you want to use Ripser in your software under a different license.
+This fork of Ripser is licensed under the MIT license (`COPYING.txt`), with an extra clause (`CONTRIBUTING.txt`) clarifying the license for modifications released without an explicit written license agreement. Please contact the author if you want to use Ripser in your software under a different license.
