@@ -23,7 +23,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
 	std::vector<index_diameter_t> working_coboundary_buffer;
-	bool check_for_emergent_pair = true;
+	bool check_for_emergent_pair = false;
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
 		// Threshold check
@@ -105,7 +105,8 @@ void compute_pairs(ripser &ripser,
 		                                                       R_j,
 		                                                       pivot_column_index);
 		// The reduction
-		index_t add_count = 0;
+		long add_count = 0;
+		long max_mem = 0;
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
@@ -117,6 +118,7 @@ void compute_pairs(ripser &ripser,
 				               dim,
 				               V_j,
 				               R_j);
+				max_mem = std::max(max_mem, get_memory_usage());
 				ripser.infos.at(dim).addition_count++;
 				pivot = get_pivot(ripser, R_j);
 				add_count++;
@@ -146,6 +148,7 @@ void compute_pairs(ripser &ripser,
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF));
 			ripser.infos.at(dim).class_count++;
 		}
+		ripser.get_current_reduction_record().max_mem = max_mem;
 		ripser.complete_reduction_record(get_time(), add_count, 0, -1);
 	}
 	ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
@@ -196,7 +199,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	std::cout << std::endl;
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
-	output_info(ripser, std::cout); std::cout << std::endl;
+	//output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, false);
 	write_short_rr(ripser, "cl");
 	exit(0);

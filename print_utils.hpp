@@ -447,32 +447,44 @@ void write_short_rr(ripser& ripser, std::string suffix="") {
 	std::ofstream os = get_writeout_stream(ripser, "_rr" + suffix);
 	for(info& info : ripser.infos) {
 		index_t dim = info.dim;
-		index_t column_count = info.simplex_total_count;
-		index_t column_red_count = info.simplex_reduction_count;
-		index_t class_count = info.class_count;
-		index_t zero_count = info.zero_pers_count;
-		index_t push_count = 0;
-		index_t pop_count = 0;
-		index_t add_count = 0;
-		float app_count = (float) info.apparent_count / (float) column_count;
-		float cl_count = (float) info.clearing_count / (float) column_count;
+		uint64_t column_count = info.simplex_total_count;
+		uint64_t column_red_count = info.simplex_reduction_count;
+		uint64_t class_count = info.class_count;
+		uint64_t zero_count = info.zero_pers_count;
+		uint64_t add_count = info.addition_count;
+		uint64_t push_count = 0;
+		uint64_t pop_count = 0;
+		uint64_t add_simplex_count = 0;
+		uint64_t app_facet_count = 0;
+		uint64_t app_cofacet_count = 0;
+		uint64_t app_count = info.apparent_count;
+		uint64_t cl_count = info.clearing_count;
+		uint64_t mem = 0;
 		float tim = info.reduction_dur.count();
 		for(reduction_record& rr : info.red_records) {
 			push_count += rr.push_count;
 			pop_count += rr.pop_count;
-			add_count += rr.add_simplex_boundary_count;
+			add_simplex_count += rr.add_simplex_boundary_count;
+			app_facet_count += rr.app_facet_count;
+			app_cofacet_count += rr.app_cofacet_count;
+			mem = std::max(mem, rr.max_mem);
 		}
 		std::string pref = "#r" + std::to_string(dim);
 		os << pref << " " << "col_count=" << column_count << std::endl;
 		os << pref << " " << "red_count=" << column_red_count << std::endl;
-		os << pref << " " << "class_count=" << class_count << std::endl;
 		os << pref << " " << "zero_count=" << zero_count << std::endl;
+		os << pref << " " << "clearing_count=" << cl_count << std::endl;
+		os << pref << " " << "app_count=" << app_count << std::endl;
+		os << pref << " " << "add_simplex_count=" << add_simplex_count << std::endl;
+		os << pref << " " << "add_count=" << add_count << std::endl;
 		os << pref << " " << "push_count=" << push_count << std::endl;
 		os << pref << " " << "pop_count=" << pop_count << std::endl;
-		os << pref << " " << "add_count=" << add_count << std::endl;
-		os << pref << " " << "app_count=" << app_count << std::endl;
-		os << pref << " " << "cl_count=" << cl_count << std::endl;
-		os << pref << " " << "time=" << tim << std::endl << std::endl;
+		os << pref << " " << "app_facet_count=" << app_facet_count << std::endl;
+		os << pref << " " << "app_cofacet_count=" << app_cofacet_count << std::endl;
+		os << pref << " " << "time=" << tim << std::endl;
+		os << pref << " " << "rep_time=" << info.representative_dur.count() << std::endl;
+		os << pref << " " << "mem=" << mem << std::endl;
+		os << pref << " " << "rr_count=" << info.red_records.size() << std::endl << std::endl;
 	}
 }
 

@@ -47,7 +47,7 @@ index_diameter_t cohom_init_coboundary_and_get_pivot(ripser &ripser,
 	for(index_diameter_t cofacet : working_coboundary_buffer) {
 		working_coboundary.push(cofacet);
 	}
-	return get_pivot(working_coboundary);
+	return get_pivot(ripser, working_coboundary);
 }
 
 index_diameter_t hom_init_boundary_and_get_pivot(ripser &ripser,
@@ -66,7 +66,7 @@ index_diameter_t hom_init_boundary_and_get_pivot(ripser &ripser,
 			working_boundary.push(facet);
 		}
 	}
-	return get_pivot(working_boundary);
+	return get_pivot(ripser, working_boundary);
 }
 
 void assemble_columns_to_reduce(ripser &ripser,
@@ -115,6 +115,7 @@ void compute_cohomology(ripser &ripser,
                         std::vector<index_diameter_t>& non_essential_indices) {
 	time_point reduction_start = get_time();
 	compressed_sparse_matrix V;
+	ripser.current_reduction_record_dim = -1;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		//ripser.add_reduction_record(dim, j, get_time());
 		V.append_column();
@@ -138,8 +139,8 @@ void compute_cohomology(ripser &ripser,
 				               dim,
 				               V_j,
 				               R_j);
-				ripser.infos.at(dim).addition_count++;
-				pivot = get_pivot(R_j);
+				//ripser.infos.at(dim).addition_count++;
+				pivot = get_pivot(ripser, R_j);
 			} else {
 				index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
 				if(get_index(e) != -1) {
@@ -148,7 +149,7 @@ void compute_cohomology(ripser &ripser,
 					                       dim,
 					                       V_j,
 					                       R_j);
-					pivot = get_pivot(R_j);
+					pivot = get_pivot(ripser, R_j);
 				} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
@@ -156,12 +157,11 @@ void compute_cohomology(ripser &ripser,
 			}
 		}
 		// Write V_j to V
-		index_diameter_t e = pop_pivot(V_j);
+		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
 			V.push_back(e);
-			e = pop_pivot(V_j);
+			e = pop_pivot(ripser, V_j);
 		}
-		//ripser.complete_reduction_record(dim, get_time(), add_count, app_count, -1);
 		// Determine Persistence Pair
 		// Note: We do need zero-persistence indices as well!
 		if(get_index(pivot) != -1) {
@@ -177,9 +177,10 @@ void compute_homology(ripser &ripser,
                       const std::vector<index_diameter_t>& columns_to_reduce,
                       entry_hash_map& pivot_column_index,
                       const index_t dim) {
-	//time_point reduction_start = get_time();
+	time_point rep_start = get_time();
 	compressed_sparse_matrix V;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+		ripser.add_reduction_record(dim, j, get_time());
 		V.append_column();
 		Hom_Column R_j;
 		Hom_Column V_j;
@@ -200,8 +201,8 @@ void compute_homology(ripser &ripser,
 				             dim,
 				             V_j,
 				             R_j);
-				//ripser.infos.at(dim).addition_count++;
-				pivot = get_pivot(R_j);
+				ripser.infos.at(dim).addition_count++;
+				pivot = get_pivot(ripser, R_j);
 			} else {
 				index_diameter_t e = get_zero_apparent_cofacet(ripser, pivot, dim - 1);
 				if(get_index(e) != -1) {
@@ -210,7 +211,7 @@ void compute_homology(ripser &ripser,
 					                     dim,
 					                     V_j,
 					                     R_j);
-					pivot = get_pivot(R_j);
+					pivot = get_pivot(ripser, R_j);
 				} else {
 					pivot_column_index.insert({get_index(pivot), j});
 					break;
@@ -221,20 +222,20 @@ void compute_homology(ripser &ripser,
 		std::vector<index_diameter_t> V_rep;
 		std::vector<index_diameter_t> R_rep;
 		V_rep.push_back(sigma_j);
-		index_diameter_t e = pop_pivot(V_j);
+		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
 			V.push_back(e);
 			V_rep.push_back(e);
-			e = pop_pivot(V_j);
+			e = pop_pivot(ripser, V_j);
 		}
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			value_t birth = std::max(0.0f, get_diameter(pivot));
 			if(get_diameter(sigma_j) > birth * ripser.config.ratio) {
-				e = pop_pivot(R_j);
+				e = pop_pivot(ripser, R_j);
 				while(get_index(e) != -1) {
 					R_rep.push_back(e);
-					e = pop_pivot(R_j);
+					e = pop_pivot(ripser, R_j);
 				}
 				ripser.add_hom_class(dim - 1, pivot, sigma_j, R_rep);
 				//ripser.infos.at(dim).class_count++;
@@ -245,8 +246,9 @@ void compute_homology(ripser &ripser,
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
 			//ripser.infos.at(dim).class_count++;
 		}
+		ripser.complete_reduction_record(get_time(), 0, 0, -1);
 	}
-	//ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
+	ripser.infos.at(dim).representative_dur = get_duration(rep_start, get_time());
 }
 
 void compute_barcodes(ripser& ripser) {
@@ -330,6 +332,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, true, false);
+	//write_standard_output(ripser, true, false);
+	write_short_rr(ripser, "_rephom");
 	exit(0);
 }

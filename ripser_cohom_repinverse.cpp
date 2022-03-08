@@ -40,7 +40,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 	for(index_diameter_t cofacet : working_coboundary_buffer) {
 		working_coboundary.push(cofacet);
 	}
-	return get_pivot(working_coboundary);
+	return get_pivot(ripser, working_coboundary);
 }
 
 void assemble_columns_to_reduce(ripser &ripser,
@@ -91,6 +91,7 @@ void compute_pairs(ripser &ripser,
                    compressed_sparse_matrix& V,
                    const index_t dim) {
 	time_point reduction_start = get_time();
+	ripser.current_reduction_record_dim = -1;
 	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
 		//ripser.add_reduction_record(dim, j, get_time());
 		V.append_column();
@@ -115,8 +116,8 @@ void compute_pairs(ripser &ripser,
 				               dim,
 				               V_j,
 				               R_j);
-				ripser.infos.at(dim).addition_count++;
-				pivot = get_pivot(R_j);
+				//ripser.infos.at(dim).addition_count++;
+				pivot = get_pivot(ripser, R_j);
 			} else {
 				//index_diameter_t e = get_zero_apparent_facet(ripser, pivot, dim + 1);
 				//if(get_index(e) != -1) {
@@ -133,10 +134,10 @@ void compute_pairs(ripser &ripser,
 			}
 		}
 		// Write V_j to V
-		index_diameter_t e = pop_pivot(V_j);
+		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
 			V.push_back(e);
-			e = pop_pivot(V_j);
+			e = pop_pivot(ripser, V_j);
 		}
 		//ripser.complete_reduction_record(dim, get_time(), add_count, app_count,
 		// R_j.size());
@@ -162,12 +163,14 @@ void add_partial_simplex_coboundary(ripser& ripser,
 {
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
+	ripser.get_current_reduction_record().add_simplex_boundary_count++;
 	while(cofacets.has_next()) {
 		index_diameter_t cofacet = cofacets.next();
 		if(get_diameter(cofacet) <= ripser.threshold &&
 		   !reverse_filtration_order(cofacet, min_simplex)
 		   )
 		{
+			ripser.get_current_reduction_record().push_count++;
 			coboundary.push(cofacet);
 		}
 	}
@@ -194,6 +197,7 @@ void compute_reps(ripser& ripser,
 	index_diameter_t current_simplex(-1, -1); // current iteration simplex
 	index_diameter_t min_simplex(-1, -1); // minimum considered simplex
 	Column P_j;
+	ripser.add_reduction_record(dim, 0, get_time());
 	while(ctr_index < (index_t) columns_to_reduce.size() ||
 	      cc_index < (index_t) cleared_columns.size())
 	{
@@ -261,7 +265,7 @@ void compute_reps(ripser& ripser,
 		}
 		// COMPUTE PRODUCT
 		index_t num_pops = 0;
-		index_diameter_t v_ele = pop_pivot(P_j);
+		index_diameter_t v_ele = pop_pivot(ripser, P_j);
 		if(get_index(v_ele) != -1) {
 			while(get_index(v_ele) != -1) {
 				for(index_t k = 0; k < (index_t) active_hom_classes.size(); k++) {
@@ -283,7 +287,7 @@ void compute_reps(ripser& ripser,
 						}
 					}
 				}
-				v_ele = pop_pivot(P_j);
+				v_ele = pop_pivot(ripser, P_j);
 				num_pops++;
 			}
 		}
@@ -306,7 +310,8 @@ void compute_reps(ripser& ripser,
 			}
 		}
 	}
-	ripser.infos.at(dim).representative_dur += get_duration(rep_start, get_time());
+	ripser.complete_reduction_record(get_time(), 0, 0, -1);
+	ripser.infos.at(dim).representative_dur = get_duration(rep_start, get_time());
 }
 
 void compute_barcodes(ripser& ripser) {
@@ -388,6 +393,7 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, true, false);
+	//write_standard_output(ripser, true, false);
+	write_short_rr(ripser, "_repinverse");
 	exit(0);
 }

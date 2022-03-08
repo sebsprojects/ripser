@@ -180,7 +180,8 @@ int main(int argc, char** argv) {
 	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, false);
-	write_analysis_rr(ripser, "_hom_clearing");
+	//write_analysis_rr(ripser, "_hom_clearing");
+	write_short_rr(ripser, "_hom_clearing");
 	exit(0);
 }
 

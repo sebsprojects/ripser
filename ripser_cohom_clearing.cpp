@@ -169,6 +169,7 @@ int main(int argc, char** argv) {
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, false);
-	write_analysis_rr(ripser, "_cohom_clearing");
+	//write_analysis_rr(ripser, "_cohom_clearing");
+	write_short_rr(ripser, "_cohom_clearing");
 	exit(0);
 }

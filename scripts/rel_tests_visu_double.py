@@ -8,51 +8,32 @@ import math
 
 from matplotlib.ticker import AutoMinorLocator
 
-appem = True
-dim = 1
 
-#datasetname = "random100"
-#base = "./rel_test/output/random100_clappem"
-#name = "random_point_cloud_100"
-#n = 100
-#appem = True
-#dim = 2
+base = "./rel_test/output/random100"
+name = "random_point_cloud_100"
+n = 100
 
-#datasetname = "random50"
-#base = "./rel_test/output/random50"
-#name = "random_point_cloud_50"
-#n = 50
-
-#datasetname = "sphere192"
-#base = "./rel_test/output/sphere192_clappem"
+#base = "./rel_test/output/sphere192"
 #name = "sphere_3_192"
 #n = 192
 
-datasetname = "covid2500"
-base = "./rel_test/output/covid2500_clappem"
-name = "covid_landdistmat"
-n = 2500
+#base = "./rel_test/output/o3_256"
+#name = "o3_1024"
+#n = 256
 
-#datasetname = "hiv1088"
-#base = "./rel_test/output/hiv1088_cl"
-#name = "hiv"
-#n = 1088
-
-#datasetname = "dragon1000"
-#base = "./rel_test/output/dragon1000_cl"
-#name = "dragon1000"
-#n = 1000
+#base = "./rel_test/output/covid_10000"
+#name = "covid_landdistmat"
+#n = 10000
 
 tex_fonts = {
     "text.usetex": True,
     "font.family": "serif",
-    "axes.titlesize": 8,
-    "axes.labelsize": 7,
-    "font.size": 8,
+    "axes.labelsize": 8,
+    "font.size": 7,
     "legend.fontsize": 7,
     "xtick.labelsize": 6,
     "ytick.labelsize": 6,
-    'text.latex.preamble': r'\usepackage{amsfonts}\usepackage{bm}\usepackage{amsmath}'
+    'text.latex.preamble': r'\usepackage{amsfonts}\usepackage{bm}'
 }
 plt.rcParams.update(tex_fonts)
 
@@ -114,14 +95,14 @@ for f in files:
         m.close()
 
 docw = 418.25372 / 72
-figw = docw
+figw = docw * 0.75
 margin = 0.05 * docw
 w = docw * 0.24 - margin
 h = w
-figh = h + 2 * margin
+figh = h * 2 + 2.5 * margin
 
 x = margin
-y = margin * 0.5
+y = margin * 2 + h
 
 fig = mplfig.Figure(figsize=(figw, figh))
 
@@ -189,13 +170,13 @@ def init_ax(ax):
     ax.tick_params(axis='both', which='major', pad=1)
 
 def plot_guides(ax, mb, include_hori=True):
-    col = "black"
+    col = "tab:red"
     st = "solid"
     lw = 0.6
     if include_hori:
-        ax.plot(xs, [1 for i in xs], color=col, lw=lw, linestyle=st)
-    if mb < 1:
-        ax.axvline(mb, color=col, lw=lw, linestyle=st)
+        ax.plot(xs, [1 for i in xs], color="black", lw=lw, linestyle=st)
+    #if mb < 1:
+    #    ax.axvline(mb, color=col, lw=lw, linestyle=st)
 
 def plot_metric(ax, metrics, dim, title, labels, relcol=False):
     ylim = 0
@@ -214,6 +195,7 @@ def plot_metric(ax, metrics, dim, title, labels, relcol=False):
     ax.set_title(title, pad=4)
     ax.set_ylim([0, ylim * 1.05])
 
+dim = 1
 ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
 init_ax(ax)
 plot_metric(ax, ["time", "mem"], dim, "runtime", ["time", "vmSize"])
@@ -221,32 +203,41 @@ x += w + margin
 
 ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
 init_ax(ax)
-plot_metric(ax, ["red_count"], dim, "column count", ["to reduce"])
+plot_metric(ax, ["col_count", "red_count"], dim, "column count", ["total", "to reduce"])
+#ylim, ys = collect_corrected_col1_metric()
+#ax.plot(xs, ys, c="tab:red")
 x += w + margin
+
+ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
+init_ax(ax)
+plot_metric(ax, ["clearing_count", "app_count"], dim, "clearing, app count", ["clearing", "apparent"])
+x += w + margin
+
+x = margin
+y -= h + margin * 1.3
 
 ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
 init_ax(ax)
 plot_metric(ax, ["add_count", "add_simplex_count"], dim, "addition count", ["add", "add_simplex"])
 x += w + margin
 
+#ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
+#init_ax(ax)
+#plot_metric(ax, ["zero_count", "app_count"], dim, "rel zero, app count", ["zero", "apparent"], True)
+#x += w + margin
+
 ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
 init_ax(ax)
 plot_metric(ax, ["push_count","pop_count"], dim, "push, pop count", ["push", "pop"])
 x += w + margin
 
-ax = fig.add_axes([ margin / figw, (figh - 1.5 * margin) / figh, (figw - 2 * margin) / figw, margin / figh])
-ax.axis("off")
+ax = fig.add_axes([ x / figw, y / figh, w / figw, h / figh])
+init_ax(ax)
+plot_metric(ax, ["app_facet_count", "app_cofacet_count"], dim, "app enum count", ["facet", "cofacet"])
+x += w + margin
 
-if appem:
-    clstr = "with"
-else:
-    clstr = "without"
-ax.text(0.5, 0.9, r'$\underline{~\text{Setup: ' + datasetname +r'},~p=' + str(dim) + r',~\text{clearing, ' + clstr + r' emergent/apparent pairs shortcut}~}$', ha="center")
+#plot_metric(x, y, , dim)
+#x += w + margin
 
-
-if appem:
-    clstr = "clappem"
-else:
-    clstr = "cl"
 fig.savefig("test.pdf", format='pdf')
-fig.savefig("../thesis/img/02-rel-" + datasetname + "-p" + str(dim) + "-" + clstr + ".pdf", format='pdf')
+#fig.savefig("../thesis/img/02-rel-random100-perf.pdf", format='pdf')

@@ -106,8 +106,9 @@ void compute_pairs(ripser &ripser,
 		                                                       R_j,
 		                                                       pivot_column_index);
 		// The reduction
-		index_t add_count = 0;
-		index_t app_count = 0;
+		long add_count = 0;
+		long app_count = 0;
+		long max_mem = 0;
 		while(get_index(pivot) != -1) {
 			auto pair = pivot_column_index.find(get_index(pivot));
 			if(pair != pivot_column_index.end()) {
@@ -119,6 +120,7 @@ void compute_pairs(ripser &ripser,
 				               dim,
 				               V_j,
 				               R_j);
+				max_mem = std::max(max_mem, get_memory_usage());
 				add_count++;
 				ripser.infos.at(dim).addition_count++;
 				pivot = get_pivot(ripser, R_j);
@@ -130,6 +132,7 @@ void compute_pairs(ripser &ripser,
 					                       dim,
 					                       V_j,
 					                       R_j);
+					max_mem = std::max(max_mem, get_memory_usage());
 					app_count++;
 					pivot = get_pivot(ripser, R_j);
 				} else {
@@ -159,6 +162,7 @@ void compute_pairs(ripser &ripser,
 		} else {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF));
 		}
+		ripser.get_current_reduction_record().max_mem = max_mem;
 		ripser.complete_reduction_record(get_time(), add_count, 0, -1);
 	}
 	ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
@@ -210,8 +214,8 @@ int main(int argc, char** argv) {
 	compute_barcodes(ripser);
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, false);
+	//write_standard_output(ripser, false, false);
 	//write_analysis_rr(ripser, "cl-app");
-	write_short_rr(ripser, "cl-app");
+	write_short_rr(ripser, "");
 	exit(0);
 }

@@ -1,67 +1,66 @@
-# Ripser EDU
-
-This is a modified version of [Ripser](https://github.com/Ripser/ripser) (by Ulrich Bauer) with the aim to educate. Refer to [Ripser's README](https://github.com/Ripser/ripser/blob/master/README.md) for general information.
-
-The current version of Ripser includes a large number of optimizations and features in a single source file. This comes at the cost of source code readability and makes it more difficult to connect theory and implementation.
-
-In this repository the original code is restructured, simplified and feature-reduced in the interest of education. More specifically:
-- Restructured source code separate core functions and data types (in [ripser\_core.hpp](./ripser_core.hpp)) from specific implementations of the reduction algorithm
-- Moved all functionality regarding the reduction algorithm out of the `ripser` class and pass the `ripser` object to functions instead
-- Simplified types and only a bare minimum of templates
-- Many added comments
-- Implementation of persistent homology and cohomology **without** optimizations
-- Optimizations such as clearing, emergent and apparent pairs are each moved to a separate file
-
-The following features of Ripser have been **removed**:
-- Support of coefficients and computation over prime fields
-- Support of a multitude of input formats (only `lower_distance_matrix` remains)
-- Progress indication
-- Support for robinhoodhash
-
-The following features have been **added**:
-- The barcode (main output of Ripser) is not printed to stdout during the reduction but stored for further analysis and printing after completion
-
-Despite the numerous structural changes, this version is in close correspondence with the original version. In particular data type, function and variable names have been (mostly) left unchanged. All implementations of the reduction use an implicit representation of the (co)boundary matrix. Most functions as well as the reduction algorithm are very close to the original if not unchanged.
-
-# Outline
-
-The original Ripser code is split into three types of files.
-
-### 1. Core Functionality: ripser\_core.hpp
+# Ripser's Core Functionality: ripser\_core.hpp
 
 [ripser\_core.hpp](./ripser_core.hpp) contains infrastructure code that is used for all versions of the reduction algorithm. It contains
-- The definition of most data types including the `ripser` class and `(co)boundary_enumerator`
-- All functionality regarding the binomial numbering system
-- All functionality regarding the enumeration of (co)faces
-- The implementation of all basic matrix operations used in the reduction algorithm (column addition, pivot extraction)
-- Functionality related to union-find
+- Data types
+- The combinatoric numbering system
+- Facet and cofacet enumeration
+- Matrix operations required by the reduction algorithm
+- Functionality for union-find, apparent pairs and relative (co)homology
+- Input processing
+- Output assembly and storage
+- Performance metric collection
 
-### 2. Implementation of the Reduction Algorithm: ripser\_*.cpp
+# Configuration: ripser\_config.cpp
 
-The implementation of the reduction algorithm and computation of the persistence barcode is split into several files. Each implements the following functions separately depending on the particular choice of (co)homology and possibly a single optimization:
+Instead of passing program parameters to Ripser directly, all versions expect a single parameter containing the path to `.ini` configuration file. The first line of this file is expected to contain `[ripser]`. Each subsequent line should comprise a single key-value pair formatted `key=value`. Empty lines, lines starting with a `#` and keys without value (e.g. `key=` are ignored. The available configuration options are the following:
+- `input\_path` (string) specifies the path to the data set relative to the current working directory.
+- `input\_type` (string) specifies whether the data set is a `point\_cloud`, `lower\_distance\_matrix` or `full\_distance\_matrix`.
+- `output\_path` (string) specifies the output directory to which all output files are written.
+- `dim\_max` (non-negative integer) specifies the maximum considered dimension with respect to the (co)boundary matrix reduction. If a homology reduction is performed this means that the barcode decomposition up to `dim\_max - 1` is computed.
+- `ratio` (non-negative float) specifies a cut-off ratio of the diameters of birth and death simplex. Non-essential pairs below this ratio are omitted from the output. If 0 is specified, zero-persistence pairs are part of the output (if not omitted due to the apparent pairs shortcut).
+- `threshold` (float) specifies the diameter threshold at which Vietoris-Rips filtration is cutoff. If omitted or negative the full Vietoris-Rips filtration is considered.
+- `use\_enclosing\_threshold` (bool) specifies whether the threshold is to be the enclosing threshold. If set to `true` (or `1`) this overwrites the parameter `threshold`.
+- `use\_union\_find` (bool) specifies whether the reduction in degree 0 should be replaced by a connected components computation. This parameter only has an effect if the version at hand implements this optimization.
+- `print\_progress` (bool) specifies whether the program prints progress updates to `stdout`.
+- `absolute\_subcomplex` (range) specifies which parts (points / submatrix) of the input data are considered for the computation. If omitted, the whole data set is used.
+- `relative\_subcomplex` (range) specifies which parts (point / submatrix) of the input data are used to induce the relative subcomplex. This parameter only has an effect if the version implements relative (co)homology. If omitted, the relative subcomplex is the empty complex (corresponding to absolute (co)homology).
+
+Values of the type string must be unquoted. The type bool has values true, false (alternatively 1 and 0). Ranges are a comma-separated list of closed intervals, specified by bounds. For instance `0-100`. Note that both bounds are always included.
+
+The parameters `input\_path`, `inpute\_type` and `dim\_max` must be specified. All other parameters are optional.
+
+# Reduction Algorithm: ripser\_*.cpp
+
+Each file contains an implementation of the reduction algorithm comprising the functions
 - `init_(co)boundary_and_get_pivot`
 - `assemble_columns_to_reduce`
 - `compute_pairs` (the main reduction algorithm)
 - `compute_barcodes`
-- `main`
 
-The following implementations are currently available:
-- Basic homology (in decreasing dimension)
-- Basic cohomology (in increasing dimension)
-- (Co)homology with clearing
-- Cohomology with the dim=0 union-find optimization
-- Cohomology with the emergent pairs optimization
-- Cohomology with the apparent pairs optimization
+All of the following versions implement a degreewise reduction, either in increasing or decreasing degree.
 
-Note, that all implementations use an implicit representation of the (co)boundary matrix (to keep memory-efficiency and a close correspondence with the original version).
+- `ripser\_hom.cpp` implements the reduction in homology with increasing degree without any further optimizations
+- `ripser\_hom\_optimized.cpp` implements the reduction in homology with increasing degree using the emergent and apparent pairs shortcut (no clearing)
+- `ripser\_hom\_clearing.cpp` implements the in homology with decreasing degree using clearing
+- `ripser\_hom_clearing\_optimized.cpp' adds the emergent and apparent pairs shortcut
+- `ripser\_cohom.cpp` implements the reduction in cohomology with decreasing degree without any further optimizations
+- `ripser\_cohom\_clearing.cpp` implements the reduction in cohomolgoy with increasing degree using clearing
+- `ripser\_cohom\_clearing\_optimized.cpp` adds the emergent and apparent pairs shortcut
+- `ripser\_cohom\_rephom.cpp` implements a secondary homology reduction to compute homology representatives
+- `ripser\_cohom\_repinverse.cpp` implements matrix inversion to compute homology representatives
+- `ripser\_cohom\_rel.cpp` implements relative cohomology with increasing degree using clearing and the emergent pairs shortcut (but not the apparent pairs shortcut)
+- `ripser\_cohom\_rel\_optimized.cpp` adds the apparent pairs shortcut
+- `ripser\_cohom\_rel\_rephom.cpp` implements a secondary reduction in (relative) homology to compute relative homology representatives
 
-### 3. Printing: print\_utils.hpp
 
-[print\_utils.hpp](./print_utils.hpp) contains all code concerning printing to stdout such as printing simplices, columns, barcodes and auxiliary information
+# Printing and Output: print\_utils.hpp
+
+[print\_utils.hpp](./print_utils.hpp) contains all code concerning printing and output. The primary output functionality comprises the following functions:
+- `output\_barcode` prints the barcode in all (or a single specified) degrees, optionally with the associated (co)homology representative.
+- `output\_info` prints coarse information about the computation, for each degree separately. This includes the elapsed runtime for assembly, reduction and representative duration as well as various counts, such as the number of cleared columns, apparent pairs and more.
+- `output\_config` prints the configuration used for the computation.
 
 
 # License
 
-Copyright © 2015–2021 [Ulrich Bauer]
-
-Ripser is licensed under the [MIT] license (`COPYING.txt`), with an extra clause (`CONTRIBUTING.txt`) clarifying the license for modifications released without an explicit written license agreement.  Please contact the author if you want to use Ripser in your software under a different license.
+This fork of Ripser is licensed under the [MIT] license (`COPYING.txt`), with an extra clause (`CONTRIBUTING.txt`) clarifying the license for modifications released without an explicit written license agreement. Please contact the author if you want to use Ripser in your software under a different license.

@@ -251,7 +251,7 @@ compressed_lower_distance_matrix read_distance_matrix(ripser_config& config,
 	std::vector<value_t> distances;
 	std::string line;
 	value_t value;
-	int offs = config.input_type == "lower_distance_matrix" ? 0 : 1;
+	int offs = config.input_type == "lower_distance_matrix" ? 0 : 0;
 	for(int i = 0; std::getline(input_stream, line); ++i) {
 		if(!is_absolute_index(config, i)) {
 			continue;
@@ -428,34 +428,43 @@ struct reduction_record {
 	index_t j;
 	time_point start;
 	time_point end;
-	long addition_count;
-	long addition_apparent_count;
-	long coboundary_element_count;
+	uint64_t addition_count;
+	uint64_t addition_apparent_count;
+	uint64_t coboundary_element_count;
 
 	bool to_zero;
 
-	long add_simplex_boundary_count;
-	long pop_count;
-	long push_count;
+	uint64_t add_simplex_boundary_count;
+	uint64_t pop_count;
+	uint64_t push_count;
+	uint64_t app_facet_count;
+	uint64_t app_cofacet_count;
+	uint64_t max_mem;
+
+	reduction_record()
+		: j(-1), start(), end(), addition_count(0), addition_apparent_count(0),
+		  coboundary_element_count(0), to_zero(true), add_simplex_boundary_count(0),
+		  pop_count(0), push_count(0), app_facet_count(0), app_cofacet_count(0), max_mem(0)
+  { }
 
 	reduction_record(index_t _j, time_point _start)
 		: j(_j), start(_start), end(), addition_count(0), addition_apparent_count(0),
 		  coboundary_element_count(0), to_zero(true), add_simplex_boundary_count(0),
-		  pop_count(0), push_count(0)
+		  pop_count(0), push_count(0), app_facet_count(0), app_cofacet_count(0), max_mem(0)
 	{
 	}
 };
 
 struct info {
 	index_t dim;
-	size_t clearing_count;
-	size_t emergent_count;
-	size_t apparent_count;
-	size_t simplex_total_count;
-	size_t simplex_reduction_count;
-	size_t class_count;
-	size_t zero_pers_count;
-	size_t addition_count;
+	uint64_t clearing_count;
+	uint64_t emergent_count;
+	uint64_t apparent_count;
+	uint64_t simplex_total_count;
+	uint64_t simplex_reduction_count;
+	uint64_t class_count;
+	uint64_t zero_pers_count;
+	uint64_t addition_count;
 	
 	duration assemble_dur;
 	duration reduction_dur;
@@ -490,6 +499,7 @@ struct ripser {
 	mutable std::vector<std::vector<homology_class>> hom_classes;
 	mutable std::vector<info> infos;
 	mutable index_t current_reduction_record_dim;
+	mutable reduction_record catch_all_record;
 
 	ripser(ripser_config _config)
 		: dist(read_input(_config)),
@@ -499,7 +509,8 @@ struct ripser {
 		  threshold(-1),
 		  hom_classes(),
 		  infos(),
-		  current_reduction_record_dim(-1)
+		  current_reduction_record_dim(-1),
+		  catch_all_record()
 	{
 		if(config.use_enclosing_threshold) {
 			threshold = compute_enclosing_radius(dist);
@@ -600,6 +611,10 @@ struct ripser {
 	}
 
 	reduction_record& get_current_reduction_record() {
+		// Return dummy
+		if(current_reduction_record_dim == -1) {
+			return catch_all_record;
+		}
 		return infos.at(current_reduction_record_dim).red_records.back();
 	}
 
@@ -1010,6 +1025,7 @@ index_diameter_t get_zero_pivot_facet(ripser& ripser, index_diameter_t simplex, 
 	simplex_boundary_enumerator facets(ripser);
 	facets.set_simplex(simplex, dim);
 	while(facets.has_next()) {
+		ripser.get_current_reduction_record().app_facet_count++;
 		index_diameter_t facet = facets.next();
 		if(get_diameter(facet) == get_diameter(simplex)) {
 			// Relative check
@@ -1025,6 +1041,7 @@ index_diameter_t get_zero_pivot_cofacet(ripser& ripser, index_diameter_t simplex
 	simplex_coboundary_enumerator cofacets(ripser);
 	cofacets.set_simplex(simplex, dim);
 	while(cofacets.has_next()) {
+		ripser.get_current_reduction_record().app_cofacet_count++;
 		index_diameter_t cofacet = cofacets.next();
 		if(get_diameter(cofacet) == get_diameter(simplex)) {
 			return cofacet;
@@ -1058,6 +1075,15 @@ bool is_in_zero_apparent_pair(ripser& ripser, index_diameter_t simplex, index_t 
 		return (get_index(get_zero_apparent_facet(ripser, simplex, dim)) != -1) ||
 		       (get_index(get_zero_apparent_cofacet(ripser, simplex, dim)) != -1);
 	}
+}
+
+// https://stackoverflow.com/questions/59817055/resident-set-size-remains-the-same-after-delete
+long get_memory_usage() {
+	long vmSize = 0;
+	std::ifstream buffer("/proc/self/statm");
+	buffer >> vmSize;
+	buffer.close();
+	return vmSize;
 }
 
 #endif

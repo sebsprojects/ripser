@@ -31,7 +31,7 @@ index_diameter_t init_coboundary_and_get_pivot(ripser &ripser,
 			{
 				if((pivot_column_index.find(get_index(cofacet)) ==
 				    pivot_column_index.end()) &&
-				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1)) 
+				   (get_index(get_zero_apparent_facet(ripser, cofacet, dim + 1)) == -1))
 				{
 					ripser.infos.at(dim).emergent_count++;
 					return cofacet;
@@ -209,6 +209,6 @@ int main(int argc, char** argv) {
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, true, false);
 	//write_analysis_rr(ripser, "_cohom_clearing_opt");
-	write_short_rr(ripser, "abs");
+	write_short_rr(ripser, "_cohom_clearing_optimized");
 	exit(0);
 }
