@@ -28,10 +28,10 @@ dim = 1
 #name = "sphere_3_192"
 #n = 192
 
-datasetname = "covid2500"
-base = "./rel_test/output/covid2500_clappem"
-name = "covid_landdistmat"
-n = 2500
+#datasetname = "covid2500"
+#base = "./rel_test/output/covid2500_clappem"
+#name = "covid_landdistmat"
+#n = 2500
 
 #datasetname = "hiv1088"
 #base = "./rel_test/output/hiv1088_cl"
@@ -42,6 +42,11 @@ n = 2500
 #base = "./rel_test/output/dragon1000_cl"
 #name = "dragon1000"
 #n = 1000
+
+datasetname = "covid-gisaid-10574"
+base = "./rel_test/output/covid_gisaid"
+name = "landdistmat"
+n = 10574
 
 tex_fonts = {
     "text.usetex": True,
@@ -60,7 +65,7 @@ files = listdir(base)
 rel_ends = []
 recs = []
 for f in files:
-    toks = f.split("_")
+    toks = f.split(".")[0].split("_")
     rel_end = 0
     for t in toks:
         if "rel" in t:
@@ -106,7 +111,9 @@ for f in files:
                 rec["app_facet_count"].append(int(line.split("=")[1]))
             if "app_cofacet_count" in line:
                 rec["app_cofacet_count"].append(int(line.split("=")[1]))
-            if "time" in line:
+            if "rep_time" in line:
+                pass
+            elif "time" in line:
                 rec["time"].append(float(line.split("=")[1]))
             if "mem" in line:
                 rec["mem"].append(float(line.split("=")[1]))
@@ -204,6 +211,8 @@ def plot_metric(ax, metrics, dim, title, labels, relcol=False):
             l, mb, ys = collect_relcol_metric(m, dim)
         else:
             l, mb, ys = collect_metric(m, dim)
+            if m == "time":
+                print(ys)
         label = ""
         if len(labels) > i:
             label=labels[i]
@@ -249,4 +258,4 @@ if appem:
 else:
     clstr = "cl"
 fig.savefig("test.pdf", format='pdf')
-fig.savefig("../thesis/img/02-rel-" + datasetname + "-p" + str(dim) + "-" + clstr + ".pdf", format='pdf')
+#fig.savefig("../thesis/img/02-rel-" + datasetname + "-p" + str(dim) + "-" + clstr + ".pdf", format='pdf')

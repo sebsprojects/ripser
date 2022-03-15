@@ -39,7 +39,7 @@ void assemble_columns_to_reduce(ripser &ripser,
 			index_diameter_t facet = facets.next();
 			// Threshold check
 			if(get_diameter(facet) <= ripser.threshold) {
-				//TODO: Uniquness check
+				//TODO: Uniquness check. This should be done in the enumerator
 				if(std::find(next_simplices.begin(), next_simplices.end(), facet) ==
 				   next_simplices.end())
 				{
@@ -55,26 +55,29 @@ void assemble_columns_to_reduce(ripser &ripser,
 	ripser.infos.at(dim).assemble_dur = get_duration(assemble_start, get_time());
 }
 
-void update_hom_class(ripser& ripser,
-                      index_t dim,
-                      index_diameter_t birth,
-                      index_diameter_t death,
-                      std::vector<index_diameter_t> rep = std::vector<index_diameter_t>()) {
+void update_cohom_class(ripser& ripser,
+                        index_t dim,
+                        index_diameter_t birth,
+                        index_diameter_t death,
+                        std::vector<index_diameter_t> rep)
+{
 	if(dim == ripser.config.dim_max) {
+		// Ratio check
 		if(get_diameter(birth) >
 		   std::max(0.0f, get_diameter(death)) * ripser.config.ratio) {
-			ripser.add_hom_class(dim + 1, birth, death, rep);
+			ripser.add_cohom_class(dim + 1, birth, death, rep);
 		}
 	} else {
 		std::vector<homology_class>& hc = ripser.hom_classes.at(dim + 1);
 		for(index_t i = 0; i < (index_t) hc.size(); i++) {
 			homology_class& h = hc.at(i);
-			if(get_index(h.birth) == get_index(birth)) {
-				// dim(birth) > dim(death), need -inf workaround for death
+			if(get_index(h.birth.second) == get_index(birth)) {
 				if(get_diameter(birth) >
 				   std::max(0.0f, get_diameter(death)) * ripser.config.ratio) {
-					h.death = death;
+					h.death.second = death;
 				} else {
+					ripser.infos.at(dim + 1).class_count--;
+					ripser.infos.at(dim + 1).zero_pers_count++;
 					hc.erase(hc.begin() + i);
 				}
 				break;
@@ -131,10 +134,16 @@ void compute_pairs(ripser &ripser,
 		// Update barcode decomp
 		if(get_index(pivot) != -1) {
 			ripser.get_current_reduction_record().to_zero = false;
-			update_hom_class(ripser, dim, pivot, sigma_j, V_rep);
+			std::vector<index_diameter_t> R_rep;
+			e = pop_pivot(ripser, R_j);
+			while(get_index(e) != -1) {
+				R_rep.push_back(e);
+				e = pop_pivot(ripser, R_j);
+			}
+			update_cohom_class(ripser, dim, pivot, sigma_j, R_rep);
 		} else {
-			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
-			//ripser.infos.at(dim).class_count++;
+			ripser.add_cohom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
+			ripser.infos.at(dim).class_count++;
 		}
 		ripser.complete_reduction_record(get_time(), add_count, 0, -1);
 	}
@@ -169,13 +178,11 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 	ripser ripser(config);
-	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
+	std::cout << std::endl;
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, true);
 	exit(0);
 }
 

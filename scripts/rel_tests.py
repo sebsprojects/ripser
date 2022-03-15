@@ -9,8 +9,8 @@ import math
 #n = 512
 #config_file = "rel_test/o3_256"
 #n = 256
-config_file = "rel_test/covid_landdistmat"
-n = 2500
+#config_file = "rel_test/covid_landdistmat"
+#n = 2500
 #config_file = "rel_test/random50"
 #n = 50
 #config_file = "rel_test/dragon1000"
@@ -19,6 +19,8 @@ n = 2500
 #n = 2723
 #config_file = "rel_test/hiv"
 #n = 1088
+config_file = "rel_test/covid_gisaid"
+n = 19746
 
 rs = ["ripsero3_cohom_rel_optimized" ]
 rel_configs = ["relative_subcomplex="]

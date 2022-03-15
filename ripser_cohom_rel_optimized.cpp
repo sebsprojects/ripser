@@ -216,6 +216,6 @@ int main(int argc, char** argv) {
 	output_info(ripser, std::cout); std::cout << std::endl;
 	//write_standard_output(ripser, false, false);
 	//write_analysis_rr(ripser, "cl-app");
-	write_short_rr(ripser, "");
+	write_reduction_record_output(ripser, false, "");
 	exit(0);
 }

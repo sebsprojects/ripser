@@ -107,28 +107,6 @@ void output_boundary_matrix(ripser& ripser, std::ostream& os)
 	*/
 }
 
-void output_barcode_simplices(ripser& ripser, std::ostream& os,
-                              total_simplex_order ord=total_filtration_order,
-                              bool pref=false)
-{
-	std::vector<std::pair<index_t, index_diameter_t>> all_simplices;
-	for(auto& hc : ripser.hom_classes) {
-		for(auto& h : hc) {
-			all_simplices.push_back(std::make_pair(h.dim, h.birth));
-			if(get_index(h.death) != -1) {
-				all_simplices.push_back(std::make_pair(h.dim + 1, h.death));
-			}
-		}
-	}
-	std::sort(all_simplices.begin(), all_simplices.end(), ord);
-	for(auto &s : all_simplices) {
-		std::string p = pref ? ("#s" + std::to_string(s.first) + "  ") : "";
-		os << p
-		   << simplex_tos(ripser, s.second, s.first, true, true, true, true, true)
-		   << std::endl;
-	}
-}
-
 void output_all_simplices(ripser& ripser, std::ostream& os,
                           total_simplex_order ord=total_filtration_order,
                           bool pref=false)
@@ -212,20 +190,19 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 		std::string p = pref ? ("#b" + std::to_string(d) + " ") : "";
 		os << (pref ? "# " : "") << "barcode in dim=" << d << std::endl;
 		for(auto& hc : ripser.hom_classes.at(d)) {
-			value_t birth = std::max(0.0f, get_diameter(hc.birth));
-			value_t death = std::max(0.0f, get_diameter(hc.death));
+			value_t birth = std::max(0.0f, get_diameter(hc.birth.second));
+			value_t death = std::max(0.0f, get_diameter(hc.death.second));
 			os << p << "  [" << birth;
 			if(death == INF) {
 				os << ", )";
 			} else {
 				os << "," << death << ")";
 			}
-			os << " ; [" << simplex_tos(ripser, hc.birth, d, 0, 1, 1, 0, 0);
+			os << " ; [" << simplex_tos(ripser, hc.birth.second, hc.birth.first, 0, 1, 1, 0, 0);
 			if(death == INF) {
 				os << ", )";
 			} else {
-				// TODO: Dimension needs to be switch to +1 (homology) or -1 (cohomology)
-				os << "," << simplex_tos(ripser, hc.death, d + 1, 0, 1, 1, 0, 0)
+				os << "," << simplex_tos(ripser, hc.death.second, hc.death.first, 0, 1, 1, 0, 0)
 				   << ")";
 			}
 			if(with_reps) {
@@ -247,15 +224,18 @@ void output_barcode(ripser& ripser, std::ostream& os, bool with_reps=false, inde
 
 void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=false)
 {
-	duration total_assemble_dur;
-	duration total_reduction_dur;
-	duration total_representative_dur;
+	duration total_assemble_dur(0);
+	duration total_reduction_dur(0);
+	duration total_representative_dur(0);
 	index_t total_reduction_count = 0;
 	index_t total_clearing_count = 0;
 	index_t total_emergent_count = 0;
 	index_t total_apparent_count = 0;
 	index_t total_addition_count = 0;
 	for(info& info : ripser.infos) {
+		if(info.simplex_total_count == 0) {
+			continue;
+		}
 		std::string p = pref ? ("#i" + std::to_string(info.dim) + " ") : "";
 		if(dim == -1 || info.dim == dim) {
 			total_assemble_dur += info.assemble_dur;
@@ -279,9 +259,9 @@ void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=fal
 			   << info.apparent_count << std::endl;
 			os << p << "  total reduction count: "
 			   << info.simplex_reduction_count << std::endl;
-			os << p << "  ... non-zero:          "
+			os << p << "  ... non-zero classes:  "
 			   << info.class_count << std::endl;
-			os << p << "  ... zero:              "
+			os << p << "  ... zero classes:      "
 			   << info.zero_pers_count<< std::endl;
 			os << p << "  addition count:        "
 			   << info.addition_count << std::endl;
@@ -297,9 +277,9 @@ void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=fal
 	}
 	std::string p = (pref ? "# " : "");
 	os << p << "total durations:" << std::endl;
-	os << p << "  assembly:       " << total_assemble_dur.count() << std::endl;
-	os << p << "  reduction:      " << total_reduction_dur.count() << std::endl;
-	os << p << "  representative: " << total_representative_dur.count() << std::endl;
+	os << p << "  assembly:       " << total_assemble_dur.count() << "s" << std::endl;
+	os << p << "  reduction:      " << total_reduction_dur.count() << "s" << std::endl;
+	os << p << "  representative: " << total_representative_dur.count() << "s" << std::endl;
 	os << p << "total counts:" << std::endl;
 	os << p << "  cleared:   " << total_clearing_count << std::endl;
 	os << p << "  emergent:  " << total_emergent_count << std::endl;
@@ -309,7 +289,8 @@ void output_info(ripser& ripser, std::ostream& os, index_t dim=-1, bool pref=fal
 
 }
 
-void output_config(ripser& ripser, std::ostream& os, bool pref=false) {
+void output_config(ripser& ripser, std::ostream& os, bool pref=false)
+{
 	std::string p = pref ? "#c " : "";
 	ripser_config& config = ripser.config;
 	os << (pref ? "# " : "") << "config" << std::endl;
@@ -367,11 +348,80 @@ void output_config(ripser& ripser, std::ostream& os, bool pref=false) {
 	os << std::endl;
 }
 
-std::ofstream get_writeout_stream(ripser& ripser, std::string suffix="") {
+void output_reduction_record(std::ostream& os, index_t dim, reduction_record& rr)
+{
+	os << std::setw(2) << dim << " ; "
+	   << std::setw(5) << rr.j << " ; "
+	   << rr.to_zero << " ; "
+	   << std::setw(5) << rr.add_simplex_boundary_count << " ; "
+	   << std::setw(7) << rr.pop_count << " ; "
+	   << std::setw(7) << rr.push_count << std::endl;
+}
+
+void output_reduction_records(std::ostream& os, ripser& ripser)
+{
+	for(info& info : ripser.infos) {
+		for(reduction_record& rr : info.red_records) {
+			output_reduction_record(os, info.dim, rr);
+		}
+	}
+}
+
+void output_reduction_record_summary(std::ostream& os, ripser& ripser)
+{
+	for(info& info : ripser.infos) {
+		index_t dim = info.dim;
+		uint64_t push_count = 0;
+		uint64_t pop_count = 0;
+		uint64_t add_simplex_count = 0;
+		uint64_t app_facet_count = 0;
+		uint64_t app_cofacet_count = 0;
+		uint64_t mem = 0;
+		float tim = info.reduction_dur.count();
+		for(reduction_record& rr : info.red_records) {
+			push_count += rr.push_count;
+			pop_count += rr.pop_count;
+			add_simplex_count += rr.add_simplex_boundary_count;
+			app_facet_count += rr.app_facet_count;
+			app_cofacet_count += rr.app_cofacet_count;
+			mem = std::max(mem, rr.max_mem);
+		}
+		std::string pref = "#r" + std::to_string(dim);
+		os << pref << " " << "col_count=" << info.simplex_total_count << std::endl;
+		os << pref << " " << "red_count=" << info.simplex_reduction_count << std::endl;
+		os << pref << " " << "class_count=" << info.class_count << std::endl;
+		os << pref << " " << "zero_count=" << info.zero_pers_count << std::endl;
+		os << pref << " " << "clearing_count=" << info.clearing_count << std::endl;
+		os << pref << " " << "app_count=" << info.apparent_count << std::endl;
+		os << pref << " " << "add_simplex_count=" << add_simplex_count << std::endl;
+		os << pref << " " << "add_count=" << info.addition_count << std::endl;
+		os << pref << " " << "push_count=" << push_count << std::endl;
+		os << pref << " " << "pop_count=" << pop_count << std::endl;
+		os << pref << " " << "app_facet_count=" << app_facet_count << std::endl;
+		os << pref << " " << "app_cofacet_count=" << app_cofacet_count << std::endl;
+		os << pref << " " << "time=" << tim << std::endl;
+		os << pref << " " << "rep_time=" << info.representative_dur.count() << std::endl;
+		os << pref << " " << "mem=" << mem << std::endl;
+		os << pref << " " << "rr_count=" << info.red_records.size() << std::endl << std::endl;
+	}
+}
+
+
+/* **************************************************************************
+ * File Write-out
+ * *************************************************************************/
+
+std::ofstream get_writeout_stream(ripser& ripser,
+                                  std::string prefix="",
+                                  std::string suffix="")
+{
 	std::string ip = ripser.config.input_path;
 	std::string dataset_name = ip.substr(ip.find_last_of("/\\") + 1);
 	std::stringstream ss;
 	ss << ripser.config.output_path << "/";
+	if(prefix != "") {
+		ss << prefix << "_";
+	}
 	ss << dataset_name.substr(0, dataset_name.find_last_of(".")) << "_";
 	ss << "d" << ripser.config.dim_max;
 	if(ripser.config.config_threshold < 0) {
@@ -413,79 +463,25 @@ std::ofstream get_writeout_stream(ripser& ripser, std::string suffix="") {
 
 void write_standard_output(ripser& ripser,
                            bool with_reps=false,
-                           bool with_simplex_list=false,
-                           total_simplex_order ord=total_filtration_order) {
-	std::ofstream ofs = get_writeout_stream(ripser);
-	output_config(ripser, ofs, true); ofs << std::endl;
-	if(with_simplex_list) {
-		output_all_simplices(ripser, ofs, ord, true);
-		ofs << std::endl;
-	}
-	output_info(ripser, ofs, -1, true); ofs << std::endl;
-	output_barcode(ripser, ofs, with_reps, -1, true); ofs << std::endl;
+                           std::string suffix="")
+{
+	std::ofstream os = get_writeout_stream(ripser, "", suffix);
+	output_config(ripser, os, true); os << std::endl;
+	output_barcode(ripser, os, with_reps, -1, true); os << std::endl;
+	output_info(ripser, os, -1, true); os << std::endl;
+	os.close();
 }
 
-void output_reduction_record(std::ostream& os, index_t dim, reduction_record& rr) {
-	os << std::setw(2) << dim << " ; "
-	   << std::setw(5) << rr.j << " ; "
-	   << rr.to_zero << " ; "
-	   << std::setw(5) << rr.add_simplex_boundary_count << " ; "
-	   << std::setw(7) << rr.pop_count << " ; "
-	   << std::setw(7) << rr.push_count << std::endl;
-}
-
-void write_analysis_rr(ripser& ripser, std::string suffix="") {
-	std::ofstream ofs = get_writeout_stream(ripser, "_rr" + suffix);
-	for(info& info : ripser.infos) {
-		for(reduction_record& rr : info.red_records) {
-			output_reduction_record(ofs, info.dim, rr);
-		}
+void write_reduction_record_output(ripser& ripser,
+                                   bool with_full_records=false,
+                                   std::string suffix="")
+{
+	std::ofstream os = get_writeout_stream(ripser, "rr", suffix);
+	output_reduction_record_summary(os, ripser);
+	if(with_full_records) {
+		output_reduction_records(os, ripser);
 	}
-}
-
-void write_short_rr(ripser& ripser, std::string suffix="") {
-	std::ofstream os = get_writeout_stream(ripser, "_rr" + suffix);
-	for(info& info : ripser.infos) {
-		index_t dim = info.dim;
-		uint64_t column_count = info.simplex_total_count;
-		uint64_t column_red_count = info.simplex_reduction_count;
-		uint64_t class_count = info.class_count;
-		uint64_t zero_count = info.zero_pers_count;
-		uint64_t add_count = info.addition_count;
-		uint64_t push_count = 0;
-		uint64_t pop_count = 0;
-		uint64_t add_simplex_count = 0;
-		uint64_t app_facet_count = 0;
-		uint64_t app_cofacet_count = 0;
-		uint64_t app_count = info.apparent_count;
-		uint64_t cl_count = info.clearing_count;
-		uint64_t mem = 0;
-		float tim = info.reduction_dur.count();
-		for(reduction_record& rr : info.red_records) {
-			push_count += rr.push_count;
-			pop_count += rr.pop_count;
-			add_simplex_count += rr.add_simplex_boundary_count;
-			app_facet_count += rr.app_facet_count;
-			app_cofacet_count += rr.app_cofacet_count;
-			mem = std::max(mem, rr.max_mem);
-		}
-		std::string pref = "#r" + std::to_string(dim);
-		os << pref << " " << "col_count=" << column_count << std::endl;
-		os << pref << " " << "red_count=" << column_red_count << std::endl;
-		os << pref << " " << "zero_count=" << zero_count << std::endl;
-		os << pref << " " << "clearing_count=" << cl_count << std::endl;
-		os << pref << " " << "app_count=" << app_count << std::endl;
-		os << pref << " " << "add_simplex_count=" << add_simplex_count << std::endl;
-		os << pref << " " << "add_count=" << add_count << std::endl;
-		os << pref << " " << "push_count=" << push_count << std::endl;
-		os << pref << " " << "pop_count=" << pop_count << std::endl;
-		os << pref << " " << "app_facet_count=" << app_facet_count << std::endl;
-		os << pref << " " << "app_cofacet_count=" << app_cofacet_count << std::endl;
-		os << pref << " " << "time=" << tim << std::endl;
-		os << pref << " " << "rep_time=" << info.representative_dur.count() << std::endl;
-		os << pref << " " << "mem=" << mem << std::endl;
-		os << pref << " " << "rr_count=" << info.red_records.size() << std::endl << std::endl;
-	}
+	os.close();
 }
 
 #endif

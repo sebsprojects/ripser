@@ -391,34 +391,25 @@ typedef std::unordered_map<index_t,
  * *************************************************************************/
 
 struct homology_class {
-	index_t dim;
-	index_diameter_t birth;
-	index_diameter_t death;
+	std::pair<index_t, index_diameter_t> birth;
+	std::pair<index_t, index_diameter_t> death;
 	std::vector<index_diameter_t> representative;
 
-	homology_class(index_t _dim, index_diameter_t _birth, index_diameter_t _death, std::vector<index_diameter_t> rep)
-		: dim(_dim),
-		  birth(_birth),
+	homology_class(std::pair<index_t, index_diameter_t> _birth,
+		           std::pair<index_t, index_diameter_t> _death,
+		           std::vector<index_diameter_t> rep)
+		: birth(_birth),
 		  death(_death),
 		  representative(rep)
 	{ }
 };
 
-bool homology_class_print_order(homology_class& a, homology_class& b) {
-	return (a.dim < b.dim) ||
-	       ((a.dim == b.dim) &&
-	        (get_diameter(a.birth) < get_diameter(b.birth))) ||
-	       ((a.dim == b.dim) &&
-	        (get_diameter(a.birth) == get_diameter(b.birth)) &&
-	        (get_diameter(a.death) < get_diameter(b.death)));
-}
-
 bool homology_class_order(homology_class& a, homology_class& b) {
-	return filtration_order(a.birth, b.birth);
+	return filtration_order(a.birth.second, b.birth.second);
 }
 
 bool reverse_homology_class_order(homology_class& a, homology_class& b) {
-	return reverse_filtration_order(a.birth, b.birth);
+	return reverse_filtration_order(a.birth.second, b.birth.second);
 }
 
 typedef std::chrono::steady_clock::time_point time_point;
@@ -476,7 +467,7 @@ struct info {
 		: dim(_dim), clearing_count(0), emergent_count(0), apparent_count(0),
 		  simplex_total_count(0), simplex_reduction_count(0), class_count(0),
 		  zero_pers_count(0), addition_count(0),
-		  assemble_dur(), reduction_dur(), representative_dur()
+		  assemble_dur(0), reduction_dur(0), representative_dur(0)
 	{ }
 };
 
@@ -607,7 +598,11 @@ struct ripser {
 	}
 
 	void add_hom_class(index_t dim, index_diameter_t birth, index_diameter_t death, std::vector<index_diameter_t> rep = std::vector<index_diameter_t>()) {
-		hom_classes.at(dim).push_back(homology_class(dim, birth, death, rep));
+		hom_classes.at(dim).push_back(homology_class(std::make_pair(dim, birth), std::make_pair(dim + 1, death), rep));
+	}
+
+	void add_cohom_class(index_t dim, index_diameter_t birth, index_diameter_t death, std::vector<index_diameter_t> rep = std::vector<index_diameter_t>()) {
+		hom_classes.at(dim).push_back(homology_class(std::make_pair(dim, birth), std::make_pair(dim - 1, death), rep));
 	}
 
 	reduction_record& get_current_reduction_record() {

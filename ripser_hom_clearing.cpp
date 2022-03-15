@@ -101,7 +101,6 @@ void compute_pairs(ripser &ripser,
 		}
 		// Write V_j to V
 		std::vector<index_diameter_t> V_rep;
-		std::vector<index_diameter_t> R_rep;
 		V_rep.push_back(sigma_j);
 		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
@@ -112,12 +111,14 @@ void compute_pairs(ripser &ripser,
 		if(get_index(pivot) != -1) {
 			ripser.get_current_reduction_record().to_zero = false;
 			value_t birth = std::max(0.0f, get_diameter(pivot));
+			// Ratio check
 			if(get_diameter(sigma_j) > birth * ripser.config.ratio) {
-				//e = pop_pivot(R_j);
-				//while(get_index(e) != -1) {
-				//	R_rep.push_back(e);
-				//	e = pop_pivot(R_j);
-				//}
+				std::vector<index_diameter_t> R_rep;
+				e = pop_pivot(ripser, R_j);
+				while(get_index(e) != -1) {
+					R_rep.push_back(e);
+					e = pop_pivot(ripser, R_j);
+				}
 				ripser.add_hom_class(dim - 1, pivot, sigma_j, R_rep);
 				ripser.infos.at(dim).class_count++;
 			} else {
@@ -173,15 +174,11 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 	ripser ripser(config);
-	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
+	std::cout << std::endl;
 	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, false);
-	//write_analysis_rr(ripser, "_hom_clearing");
-	write_short_rr(ripser, "_hom_clearing");
 	exit(0);
 }
 

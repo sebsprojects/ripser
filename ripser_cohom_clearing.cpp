@@ -101,21 +101,34 @@ void compute_pairs(ripser &ripser,
 			}
 		}
 		// Write V_j to V
+		std::vector<index_diameter_t> V_rep;
+		V_rep.push_back(sigma_j);
 		index_diameter_t e = pop_pivot(ripser, V_j);
 		while(get_index(e) != -1) {
 			V.push_back(e);
+			V_rep.push_back(e);
 			e = pop_pivot(ripser, V_j);
 		}
 		// Determine Persistence Pair
 		if(get_index(pivot) != -1) {
 			ripser.get_current_reduction_record().to_zero = false;
 			value_t death = std::max(0.0f, get_diameter(sigma_j));
-			value_t birth = get_diameter(pivot);
-			if(birth > death * ripser.config.ratio) {
-				ripser.add_hom_class(dim, sigma_j, pivot);
+			// Ratio check
+			if(get_diameter(pivot) > death * ripser.config.ratio) {
+				std::vector<index_diameter_t> R_rep;
+				e = pop_pivot(ripser, R_j);
+				while(get_index(e) != -1) {
+					R_rep.push_back(e);
+					e = pop_pivot(ripser, R_j);
+				}
+				ripser.add_cohom_class(dim + 1, pivot, sigma_j, R_rep);
+				ripser.infos.at(dim + 1).class_count++;
+			} else {
+				ripser.infos.at(dim + 1).zero_pers_count++;
 			}
 		} else {
-			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF));
+			ripser.add_cohom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
+			ripser.infos.at(dim).class_count++;
 		}
 		ripser.complete_reduction_record(get_time(), add_count, 0, -1);
 	}
@@ -163,13 +176,9 @@ int main(int argc, char** argv) {
 	}
 	ripser ripser(config);
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
-	std::cout << std::endl;
+	std::cout << std::endl << std::endl;
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, false);
-	//write_analysis_rr(ripser, "_cohom_clearing");
-	write_short_rr(ripser, "_cohom_clearing");
 	exit(0);
 }

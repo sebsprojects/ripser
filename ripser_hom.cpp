@@ -12,7 +12,8 @@ typedef std::priority_queue<index_diameter_t,
 index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
                                              const index_diameter_t simplex,
                                              const index_t dim,
-                                             Column& working_boundary) {
+                                             Column& working_boundary)
+{
 	if(dim == 0) {
 		return index_diameter_t(-1, -1);
 	}
@@ -20,6 +21,7 @@ index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
 	facets.set_simplex(simplex, dim);
 	while(facets.has_next()) {
 		index_diameter_t facet = facets.next();
+		// Threshold check
 		if(get_diameter(facet) <= ripser.threshold) {
 			working_boundary.push(facet);
 		}
@@ -29,7 +31,8 @@ index_diameter_t init_boundary_and_get_pivot(ripser &ripser,
 
 void assemble_columns_to_reduce(ripser &ripser,
                                 std::vector<index_diameter_t>& simplices,
-                                const index_t dim) {
+                                const index_t dim)
+{
 	time_point assemble_start = get_time();
 	std::vector<index_diameter_t> next_simplices;
 	simplex_coboundary_enumerator cofacets(ripser);
@@ -50,20 +53,25 @@ void assemble_columns_to_reduce(ripser &ripser,
 	ripser.infos.at(dim).simplex_reduction_count = simplices.size();
 }
 
+// Used when a death index is encountered, adding it to the corresponding
+// homology class
 void update_hom_class(ripser& ripser,
                       index_t dim,
                       index_diameter_t birth,
                       index_diameter_t death,
-                      std::vector<index_diameter_t> R_rep) {
+                      std::vector<index_diameter_t> R_rep)
+{
 	std::vector<homology_class>& hc = ripser.hom_classes.at(dim - 1);
 	for(index_t i = 0; i < (index_t) hc.size(); i++) {
 		homology_class& h = hc.at(i);
-		if(get_index(h.birth) == get_index(birth)) {
-			// dim(death) > dim(birth), need -inf workaround for birth
+		if(get_index(h.birth.second) == get_index(birth)) {
+			// Ratio check
 			if(get_diameter(death) >
 			   std::max(0.0f, get_diameter(birth)) * ripser.config.ratio) {
-				h.death = death;
+				h.death.second = death;
 			} else {
+				ripser.infos.at(dim - 1).class_count--;
+				ripser.infos.at(dim - 1).zero_pers_count++;
 				hc.erase(hc.begin() + i);
 			}
 			break;
@@ -73,11 +81,12 @@ void update_hom_class(ripser& ripser,
 
 void compute_pairs(ripser &ripser,
                    const std::vector<index_diameter_t>& columns_to_reduce,
-                   const index_t dim) {
+                   const index_t dim)
+{
 	time_point reduction_start = get_time();
 	compressed_sparse_matrix V;
 	entry_hash_map pivot_column_index;
-	for(size_t j = 0; j < columns_to_reduce.size(); ++j) { // For j in J
+	for(size_t j = 0; j < columns_to_reduce.size(); ++j) {
 		ripser.add_reduction_record(dim, j, get_time());
 		V.append_column();
 		Column R_j;
@@ -129,13 +138,15 @@ void compute_pairs(ripser &ripser,
 			update_hom_class(ripser, dim, pivot, sigma_j, R_rep);
 		} else if(dim == ripser.n - 1 || dim < ripser.config.dim_max) {
 			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF), V_rep);
-			//ripser.infos.at(dim).class_count++;
+			ripser.infos.at(dim).class_count++;
 		}
+		ripser.complete_reduction_record(get_time(), add_count, 0, -1);
 	}
 	ripser.infos.at(dim).reduction_dur = get_duration(reduction_start, get_time());
 }
 
-void compute_barcodes(ripser& ripser) {
+void compute_barcodes(ripser& ripser)
+{
 	std::vector<index_diameter_t> simplices;
 	time_point assemble_start = get_time();
 	assemble_all_simplices(ripser, simplices, 0);
@@ -157,7 +168,8 @@ void compute_barcodes(ripser& ripser) {
  * Main
  * *************************************************************************/
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
 	ripser_config config;
 	if(argc == 2) {
 		config = read_config(argv[1]);
@@ -166,13 +178,10 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 	ripser ripser(config);
-	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_all_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
+	std::cout << std::endl << std::endl;
 	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	write_standard_output(ripser, true, false);
-	//write_analysis_rr(ripser, "_hom");
 	exit(0);
 }

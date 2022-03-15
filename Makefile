@@ -1,3 +1,5 @@
+# -g versions
+
 ripser_hom: ripser_hom.cpp
 	c++ -std=c++11 -Wall ripser_hom.cpp -o ripser_hom -g
 
@@ -34,6 +36,7 @@ ripser_cohom_rel_optimized: ripser_cohom_rel_optimized.cpp
 ripser_cohom_rel_rephom: ripser_cohom_rel_rephom.cpp
 	c++ -std=c++11 -Wall ripser_cohom_rel_rephom.cpp -o ripser_cohom_rel_rephom -g
 
+
 # -O3 versions
 
 ripsero3_hom_clearing: ripser_hom_clearing.cpp
@@ -61,11 +64,6 @@ ripsero3_cohom_repinverse: ripser_cohom_repinverse.cpp
 	c++ -std=c++11 -Wall ripser_cohom_repinverse.cpp -o ripsero3_cohom_repinverse -O3
 
 
-# Misc versions
-
-ripser_dualbasis: ripser_dualbasis.cpp
-	c++ -std=c++11 -Wall ripser_dualbasis.cpp -o ripser_dualbasis -g
-
 
 clean:
 	rm -f \
@@ -83,7 +81,11 @@ ripser_cohom_rel_optimized \
 ripser_cohom_rel_rephom \
 ripsero3_cohom_clearing_optimized \
 ripsero3_hom_clearing_optimized \
+ripsero3_hom_clearing \
 ripsero3_cohom_rel \
+ripsero3_cohom_clearing \
 ripsero3_cohom_rel_optimized \
+ripsero3_cohom_rephom \
+ripsero3_cohom_repinverse \
 ripser_dualbasis
 
