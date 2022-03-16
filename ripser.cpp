@@ -112,7 +112,7 @@ public:
 	}
 
 	index_t operator()(index_t n, index_t k) const {
-		assert(n < B.size() && k < B[n].size() && n >= k - 1);
+		//assert(n < B.size() && k < B[n].size() && n >= k - 1);
 		return B[k][n];
 	}
 };
@@ -408,6 +408,7 @@ template <typename DistanceMatrix> class ripser {
 	const coefficient_t modulus;
 	const binomial_coeff_table binomial_coeff;
 	const std::vector<coefficient_t> multiplicative_inverse;
+	const std::vector<std::pair<int, int>> relative_vertex_intervals;
 	mutable std::vector<diameter_entry_t> cofacet_entries;
 	mutable std::vector<index_t> vertices;
 
@@ -425,11 +426,13 @@ template <typename DistanceMatrix> class ripser {
 
 public:
 	ripser(DistanceMatrix&& _dist, index_t _dim_max, value_t _threshold, float _ratio,
-	       coefficient_t _modulus)
+	       coefficient_t _modulus,
+	       std::vector<std::pair<int, int>> _relative_vertex_intervals)
 	    : dist(std::move(_dist)), n(dist.size()),
 	      dim_max(std::min(_dim_max, index_t(dist.size() - 2))), threshold(_threshold),
 	      ratio(_ratio), modulus(_modulus), binomial_coeff(n, dim_max + 2),
-	      multiplicative_inverse(multiplicative_inverse_vector(_modulus)) {}
+	      multiplicative_inverse(multiplicative_inverse_vector(_modulus)),
+	      relative_vertex_intervals(_relative_vertex_intervals) {}
 
 	index_t get_max_vertex(const index_t idx, const index_t k, const index_t n) const {
 		return get_max(n, k - 1, [&](index_t w) -> bool { return (binomial_coeff(w, k) <= idx); });
@@ -463,6 +466,35 @@ public:
 				diam = std::max(diam, dist(vertices[i], vertices[j]));
 			}
 		return diam;
+	}
+	
+	bool is_relative_vertex(index_t idx) const {
+		for(index_t i = 0; i < (index_t) relative_vertex_intervals.size(); i++) {
+			auto pair = relative_vertex_intervals.at(i);
+			if(idx >= pair.first && idx <= pair.second) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	bool is_relative_simplex(index_t idx, const index_t dim) const {
+		index_t n = this->n - 1;
+		for(index_t k = dim + 1; k > 0; --k) {
+			n = get_max_vertex(idx, k, n);
+			if(!is_relative_vertex(n)) {
+				return false;
+			}
+			idx -= binomial_coeff(n, k);
+		}
+		return true;
+	}
+
+	index_t get_first_relative_vertex() const {
+		for(index_t i = 0; i < (index_t) relative_vertex_intervals.size(); i++) {
+			return relative_vertex_intervals.at(i).first;
+		}
+		return -1;
 	}
 
 	class simplex_coboundary_enumerator;
@@ -521,7 +553,9 @@ public:
 		facets.set_simplex(simplex, dim);
 		while (facets.has_next()) {
 			diameter_entry_t facet = facets.next();
-			if (get_diameter(facet) == get_diameter(simplex)) return facet;
+			if (get_diameter(facet) == get_diameter(simplex)) {
+				if (!is_relative_simplex(get_index(facet), dim - 1)) return facet;
+			}
 		}
 		return diameter_entry_t(-1);
 	}
@@ -531,7 +565,9 @@ public:
 		cofacets.set_simplex(simplex, dim);
 		while (cofacets.has_next()) {
 			diameter_entry_t cofacet = cofacets.next();
-			if (get_diameter(cofacet) == get_diameter(simplex)) return cofacet;
+			if (get_diameter(cofacet) == get_diameter(simplex)) {
+				if (!is_relative_simplex(get_index(cofacet), dim + 1)) return cofacet;
+			}
 		}
 		return diameter_entry_t(-1);
 	}
@@ -586,7 +622,8 @@ public:
 				auto cofacet = cofacets.next();
 				if (get_diameter(cofacet) <= threshold) {
 					if (dim < dim_max) next_simplices.push_back({get_diameter(cofacet), get_index(cofacet)});
-					if (!is_in_zero_apparent_pair(cofacet, dim) &&
+					if (!is_relative_simplex(get_index(cofacet), dim) &&
+					    !is_in_zero_apparent_pair(cofacet, dim) &&
 					    (pivot_column_index.find(get_entry(cofacet)) == pivot_column_index.end()))
 						columns_to_reduce.push_back({get_diameter(cofacet), get_index(cofacet)});
 				}
@@ -619,10 +656,23 @@ public:
 		std::sort(edges.rbegin(), edges.rend(),
 		          greater_diameter_or_smaller_index<diameter_index_t>);
 		std::vector<index_t> vertices_of_edge(2);
+		index_t first_relative_vertex = get_first_relative_vertex();
+		if (first_relative_vertex != -1) {
+			// Prelink relative part
+			for (index_t j = 0; j < n; j++) {
+				if (is_relative_vertex(j) && j != first_relative_vertex) {
+					dset.link(first_relative_vertex, j);
+				}
+			}
+		}
 		for (auto e : edges) {
 			get_simplex_vertices(get_index(e), 1, n, vertices_of_edge.rbegin());
 			index_t u = dset.find(vertices_of_edge[0]), v = dset.find(vertices_of_edge[1]);
 
+			if (is_relative_vertex(vertices_of_edge[0]) &&
+		        is_relative_vertex(vertices_of_edge[1])) {
+				continue;
+			}
 			if (u != v) {
 #ifdef PRINT_PERSISTENCE_PAIRS
 				if (get_diameter(e) != 0)
@@ -635,8 +685,10 @@ public:
 		if (dim_max > 0) std::reverse(columns_to_reduce.begin(), columns_to_reduce.end());
 
 #ifdef PRINT_PERSISTENCE_PAIRS
-		for (index_t i = 0; i < n; ++i)
-			if (dset.find(i) == i) std::cout << " [0, )" << std::endl;
+		if (first_relative_vertex == -1) {
+			for (index_t i = 0; i < n; ++i)
+				if (dset.find(i) == i) std::cout << " [0, )" << std::endl;
+		}
 #endif
 	}
 
@@ -1167,8 +1219,37 @@ void print_usage_and_exit(int exit_code) {
 	    << std::endl
 #endif
 	    << "  --ratio <r>      only show persistence pairs with death/birth ratio > r" << std::endl
+		<< "  --relative       either a fraction or a list of data point index ranges" << std::endl
+		<< "                   specifiying a relative subcomplex:"
+		<< std::endl
+		<< "                     fraction       (from 0.0 to 1.0, specifies a prefix of the input data)"
+		<< std::endl
+		<< "                     list of ranges (in the format x-y specifying the closed interval [x,y],"
+		<< std::endl
+		<< "                                     multiple comma-separated (no spaces) ranges are allowed)"
 	    << std::endl;
 	exit(exit_code);
+}
+
+std::pair<int, int> parse_interval(std::string tok) {
+	size_t dash_pos = tok.find("-");
+	if(dash_pos == std::string::npos) {
+		return std::make_pair(std::stoi(tok), std::stoi(tok));
+	} else {
+		int start = -1;
+		int end = -1;
+		std::string string_start = tok.substr(0, dash_pos);
+		if(!string_start.empty()) {
+			start = std::stoi(string_start);
+		}
+		if(dash_pos + 1 < tok.length()) {
+			std::string string_end = tok.substr(dash_pos + 1, tok.length());
+			if(!string_end.empty()) {
+				end = std::stoi(string_end);
+			}
+		}
+		return std::make_pair(start, end);
+	}
 }
 
 int main(int argc, char** argv) {
@@ -1179,7 +1260,9 @@ int main(int argc, char** argv) {
 	index_t dim_max = 1;
 	value_t threshold = std::numeric_limits<value_t>::max();
 	float ratio = 1;
+	float relative_fraction = -1.0;
 	coefficient_t modulus = 2;
+	std::vector<std::pair<int, int>> relative_vertex_intervals;
 
 	for (index_t i = 1; i < argc; ++i) {
 		const std::string arg(argv[i]);
@@ -1218,6 +1301,31 @@ int main(int argc, char** argv) {
 				format = BINARY;
 			else
 				print_usage_and_exit(-1);
+		} else if (arg == "--relative") {
+			std::string parameter = std::string(argv[++i]);
+			if (!parameter.empty()) {
+				if (parameter.find("-") == std::string::npos) {
+					std::cout << parameter << std::endl;
+					size_t next_pos;
+					try {
+						relative_fraction = std::stof(parameter, &next_pos);
+					} catch(...) {
+						print_usage_and_exit(-1);
+					}
+					if (next_pos != parameter.size()) print_usage_and_exit(-1);
+				} else {
+					size_t comma_pos = 0;
+					std::string tok = "";
+					while ((comma_pos = parameter.find(",")) != std::string::npos) {
+						tok = parameter.substr(0, comma_pos);
+						relative_vertex_intervals.push_back(parse_interval(tok));
+						parameter.erase(0, comma_pos + 1);
+					}
+					relative_vertex_intervals.push_back(parse_interval(parameter));
+				} 
+			}else {
+				print_usage_and_exit(-1);
+			}
 #ifdef USE_COEFFICIENTS
 		} else if (arg == "--modulus") {
 			std::string parameter = std::string(argv[++i]);
@@ -1243,12 +1351,17 @@ int main(int argc, char** argv) {
 		std::cout << "sparse distance matrix with " << dist.size() << " points and "
 		          << dist.num_edges << "/" << (dist.size() * (dist.size() - 1)) / 2 << " entries"
 		          << std::endl;
-
-		ripser<sparse_distance_matrix>(std::move(dist), dim_max, threshold, ratio, modulus)
+		if (relative_fraction >= 0.0) {
+			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+		}
+		ripser<sparse_distance_matrix>(std::move(dist), dim_max, threshold, ratio, modulus, relative_vertex_intervals)
 		    .compute_barcodes();
 	} else if (format == POINT_CLOUD && threshold < std::numeric_limits<value_t>::max()) {
 		sparse_distance_matrix dist(read_point_cloud(filename ? file_stream : std::cin), threshold);
-		ripser<sparse_distance_matrix>(std::move(dist), dim_max, threshold, ratio, modulus)
+		if (relative_fraction >= 0.0) {
+			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+		}
+		ripser<sparse_distance_matrix>(std::move(dist), dim_max, threshold, ratio, modulus, relative_vertex_intervals)
 				.compute_barcodes();
 	} else {
 		compressed_lower_distance_matrix dist =
@@ -1274,13 +1387,16 @@ int main(int argc, char** argv) {
 			if (d <= threshold) ++num_edges;
 		}
 		std::cout << "value range: [" << min << "," << max_finite << "]" << std::endl;
+		
+		if (relative_fraction >= 0.0) {
+			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+		}
 
 		if (threshold == std::numeric_limits<value_t>::max()) {
 			std::cout << "distance matrix with " << dist.size()
 			          << " points, using threshold at enclosing radius " << enclosing_radius
 			          << std::endl;
-			ripser<compressed_lower_distance_matrix>(std::move(dist), dim_max, enclosing_radius,
-			                                         ratio, modulus)
+			ripser<compressed_lower_distance_matrix>(std::move(dist), dim_max, enclosing_radius, ratio, modulus, relative_vertex_intervals)
 			    .compute_barcodes();
 		} else {
 			std::cout << "sparse distance matrix with " << dist.size() << " points and "
@@ -1288,7 +1404,7 @@ int main(int argc, char** argv) {
 			          << std::endl;
 
 			ripser<sparse_distance_matrix>(sparse_distance_matrix(std::move(dist), threshold),
-			                               dim_max, threshold, ratio, modulus)
+			                               dim_max, threshold, ratio, modulus, relative_vertex_intervals)
 			    .compute_barcodes();
 		}
 		exit(0);
