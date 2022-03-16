@@ -1389,7 +1389,7 @@ int main(int argc, char** argv) {
 		}
 		std::cout << "value range: [" << min << "," << max_finite << "]" << std::endl;
 		
-		if (relative_fraction >= 0.0) {
+		if (relative_fraction > 0.0) {
 			index_t endpoint = std::floor(relative_fraction * dist.size()) - 1;
 			relative_vertex_intervals.push_back(std::make_pair(0, std::max(0, (int) endpoint)));
 		}

@@ -87,7 +87,7 @@ The input is given either in a file whose name is passed as an argument, or thro
   - `--ratio r`: only show persistence pairs with death/birth ratio > *r*.
   - `--relative`: either a fraction or a list of data point index ranges specifiying a relative subcomplex:
     - fraction (from 0.0 to 1.0), specifies a prefix of the input data
-    - list of ranges (in the format a-b,c-d,e-f,...) specifying the closed intervals [a,b], [c,d], [e,f] and so forth. Data point indices start at 0 and one-element intervals are specified by a-a. Ranges must be comma-separated without any spaces.
+    - list of ranges (in the format a-b,c-d,e-f,...) specifying the closed intervals [a,b], [c,d], [e,f] and so forth. Data point indices start at 0 and one-element intervals are specified by a-a. Ranges must be disjoint and comma-separated without any spaces.
 
 
 ### Experimental features
