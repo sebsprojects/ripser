@@ -400,16 +400,17 @@ index_t get_max(index_t top, const index_t bottom, const Predicate pred) {
 
 template <typename DistanceMatrix> class ripser {
 	const DistanceMatrix dist;
-	const index_t n, dim_max;
+	const index_t n;
+	const index_t dim_max;
 	const value_t threshold;
 	const float ratio;
 	const coefficient_t modulus;
 	const binomial_coeff_table binomial_coeff;
 	const std::vector<coefficient_t> multiplicative_inverse;
+	std::ostream& out_stream;
 	const std::vector<std::pair<int, int>> relative_vertex_intervals;
 	mutable std::vector<diameter_entry_t> cofacet_entries;
 	mutable std::vector<index_t> vertices;
-	std::ostream& out_stream;
 
 	struct entry_hash {
 		std::size_t operator()(const entry_t& e) const { return hash<index_t>()(::get_index(e)); }
@@ -1422,8 +1423,9 @@ int main(int argc, char** argv) {
 		           << dist.num_edges << "/" << (dist.size() * (dist.size() - 1)) / 2 << " entries"
 		           << std::endl;
 
-		if (relative_fraction >= 0.0) {
-			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+		if (relative_fraction > 0.0) {
+			index_t endpoint = std::floor(relative_fraction * dist.size()) - 1;
+			relative_vertex_intervals.push_back(std::make_pair(0, std::max(0, (int) endpoint)));
 		}
 		ripser<sparse_distance_matrix>(std::move(dist), dim_max, threshold, ratio, modulus,
 		                               out_stream, relative_vertex_intervals)
@@ -1431,8 +1433,9 @@ int main(int argc, char** argv) {
 	} else {
 		compressed_lower_distance_matrix dist =
 		    read_file(filename ? file_stream : std::cin, format);
-		if (relative_fraction >= 0.0) {
-			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+		if (relative_fraction > 0.0) {
+			index_t endpoint = std::floor(relative_fraction * dist.size()) - 1;
+			relative_vertex_intervals.push_back(std::make_pair(0, std::max(0, (int) endpoint)));
 		}
 
 		value_t min = std::numeric_limits<value_t>::infinity(),

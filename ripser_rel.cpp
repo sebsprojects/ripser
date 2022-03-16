@@ -1350,15 +1350,17 @@ int main(int argc, char** argv) {
 		std::cout << "sparse distance matrix with " << dist.size() << " points and "
 		          << dist.num_edges << "/" << (dist.size() * (dist.size() - 1)) / 2 << " entries"
 		          << std::endl;
-		if (relative_fraction >= 0.0) {
-			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+		if (relative_fraction > 0.0) {
+			index_t endpoint = std::floor(relative_fraction * dist.size()) - 1;
+			relative_vertex_intervals.push_back(std::make_pair(0, std::max(0, (int) endpoint)));
 		}
 		ripser<sparse_distance_matrix>(std::move(dist), dim_max, threshold, ratio, modulus, relative_vertex_intervals)
 		    .compute_barcodes();
 	} else if (format == POINT_CLOUD && threshold < std::numeric_limits<value_t>::max()) {
 		sparse_distance_matrix dist(read_point_cloud(filename ? file_stream : std::cin), threshold);
-		if (relative_fraction >= 0.0) {
-			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+		if (relative_fraction > 0.0) {
+			index_t endpoint = std::floor(relative_fraction * dist.size()) - 1;
+			relative_vertex_intervals.push_back(std::make_pair(0, std::max(0, (int) endpoint)));
 		}
 		ripser<sparse_distance_matrix>(std::move(dist), dim_max, threshold, ratio, modulus, relative_vertex_intervals)
 				.compute_barcodes();
@@ -1388,7 +1390,8 @@ int main(int argc, char** argv) {
 		std::cout << "value range: [" << min << "," << max_finite << "]" << std::endl;
 		
 		if (relative_fraction >= 0.0) {
-			relative_vertex_intervals.push_back(std::make_pair(0, std::floor(relative_fraction * dist.size())));
+			index_t endpoint = std::floor(relative_fraction * dist.size()) - 1;
+			relative_vertex_intervals.push_back(std::make_pair(0, std::max(0, (int) endpoint)));
 		}
 
 		if (threshold == std::numeric_limits<value_t>::max()) {

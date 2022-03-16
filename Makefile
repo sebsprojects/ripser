@@ -1,25 +1,22 @@
-build: ripser
+all: ripser-rel ripser-rel-coeff ripser-rel-debug ripser-rel-trc ripser-rel-trc-coeff ripser-rel-trc-debug
 
+ripser-rel: ripser_rel.cpp
+	c++ -std=c++11 -Wall ripser_rel.cpp -o ripser-rel -O3 -D NDEBUG
 
-all: ripser ripser-coeff ripser-debug ripser-trc ripser-trc-coeff ripser-trc-debug
+ripser-rel-coeff: ripser_rel.cpp
+	c++ -std=c++11 -Wall ripser_rel.cpp -o ripser-rel-coeff -O3 -D NDEBUG -D USE_COEFFICIENTS
 
-ripser: ripser.cpp
-	c++ -std=c++11 -Wall ripser.cpp -o ripser -O3 -D NDEBUG
+ripser-rel-debug: ripser_rel.cpp
+	c++ -std=c++11 -Wall ripser_rel.cpp -o ripser-rel-debug -g
 
-ripser-coeff: ripser.cpp
-	c++ -std=c++11 -Wall ripser.cpp -o ripser-coeff -O3 -D NDEBUG -D USE_COEFFICIENTS
+ripser-rel-trc: ripser_rel_tight_representative_cycles.cpp
+	c++ -std=c++11 -Wall ripser_rel_tight_representative_cycles.cpp -o ripser-rel-trc -O3 -D NDEBUG
 
-ripser-debug: ripser.cpp
-	c++ -std=c++11 -Wall ripser.cpp -o ripser-debug -g
+ripser-rel-trc-coeff: ripser_rel_tight_representative_cycles.cpp
+	c++ -std=c++11 -Wall ripser_rel_tight_representative_cycles.cpp -o ripser-rel-trc-coeff -O3 -D NDEBUG -D USE_COEFFICIENTS
 
-ripser-trc: ripser_tight_representative_cycles.cpp
-	c++ -std=c++11 -Wall ripser_tight_representative_cycles.cpp -o ripser-trc -O3 -D NDEBUG
-
-ripser-trc-coeff: ripser_tight_representative_cycles.cpp
-	c++ -std=c++11 -Wall ripser_tight_representative_cycles.cpp -o ripser-trc-coeff -O3 -D NDEBUG -D USE_COEFFICIENTS
-
-ripser-trc-debug: ripser_tight_representative_cycles.cpp
-	c++ -std=c++11 -Wall ripser_tight_representative_cycles.cpp -o ripser-trc-debug -g
+ripser-rel-trc-debug: ripser_rel_tight_representative_cycles.cpp
+	c++ -std=c++11 -Wall ripser_rel_tight_representative_cycles.cpp -o ripser_rel-trc-debug -g
 
 clean:
-	rm -f ripser ripser-coeff ripser-debug ripser-trc ripser-trc-coeff ripser-trc-debug
+	rm -f ripser-rel ripser-rel-coeff ripser-rel-debug ripser-rel-trc ripser-rel-trc-coeff ripser-rel-trc-debug
