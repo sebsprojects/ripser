@@ -86,8 +86,8 @@ The input is given either in a file whose name is passed as an argument, or thro
   - `--modulus p`: compute homology with coefficients in the prime field Z/*p*Z (only available when built with the option `USE_COEFFICIENTS`).
   - `--ratio r`: only show persistence pairs with death/birth ratio > *r*.
   - `--relative`: either a fraction or a list of data point index ranges specifiying a relative subcomplex:
-    - fraction (from 0.0 to 1.0, specifies a prefix of the input data)
-    - list of ranges (in the format a-b specifying the closed interval [a,b]. Data point indices start at 0. Multiple comma-separated ranges (no spaces) are allowed. One-element intervals are specified a-a.
+    - fraction (from 0.0 to 1.0), specifies a prefix of the input data
+    - list of ranges (in the format a-b specifying the closed interval [a,b]. Data point indices start at 0. One-element intervals are specified a-a. Multiple comma-separated ranges (no spaces) are allowed.
 
 
 ### Experimental features
