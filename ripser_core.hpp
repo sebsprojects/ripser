@@ -251,14 +251,15 @@ compressed_lower_distance_matrix read_distance_matrix(ripser_config& config,
 	std::vector<value_t> distances;
 	std::string line;
 	value_t value;
-	int offs = config.input_type == "lower_distance_matrix" ? 0 : 0;
+	int offs = config.input_type == "full_distance_matrix" ? -1 : 0;
 	for(int i = 0; std::getline(input_stream, line); ++i) {
 		if(!is_absolute_index(config, i)) {
 			continue;
 		}
 		std::istringstream s(line);
-		for (int j = 0; j < i + offs; ++j) {
+		for (int j = 0; j <= i + offs; ++j) {
 			s >> value;
+			std::cout << value << std::endl;
 			if(!is_absolute_index(config, j)) {
 				continue;
 			}
@@ -774,7 +775,7 @@ public:
 		//TODO(seb): Do we really need the diameter of simplex in this enumerator?
 		value_t cofacet_diameter = get_diameter(simplex);
 		for (index_t i : vertices) {
-		  cofacet_diameter = std::max(cofacet_diameter, parent.dist(j, i));
+			cofacet_diameter = std::max(cofacet_diameter, parent.dist(j, i));
 		}
 		index_t cofacet_index = idx_above + parent.binomial_coeff(j--, k + 1) + idx_below;
 		return index_diameter_t(cofacet_index, cofacet_diameter);
@@ -918,8 +919,11 @@ void add_simplex_boundary(ripser &ripser,
 		index_diameter_t facet = facets.next();
 		// Threshold check
 		if(get_diameter(facet) <= ripser.threshold) {
-			ripser.get_current_reduction_record().push_count++;
-			working_boundary.push(facet);
+			// Relative check
+			if(!ripser.is_relative_simplex(get_index(facet), dim - 1)) {
+				ripser.get_current_reduction_record().push_count++;
+				working_boundary.push(facet);
+			}
 		}
 	}
 }

@@ -139,13 +139,13 @@ void compute_pairs(ripser &ripser,
 			value_t death = std::max(0.0f, get_diameter(sigma_j));
 			value_t birth = get_diameter(pivot);
 			if(birth > death * ripser.config.ratio) {
-				ripser.add_hom_class(dim, sigma_j, pivot);
+				ripser.add_cohom_class(dim, sigma_j, pivot);
 				ripser.infos.at(dim).class_count++;
 			} else {
 				ripser.infos.at(dim).class_count++;
 			}
 		} else {
-			ripser.add_hom_class(dim, sigma_j, index_diameter_t(-1, INF));
+			ripser.add_cohom_class(dim, sigma_j, index_diameter_t(-1, INF));
 			ripser.infos.at(dim).class_count++;
 		}
 		ripser.get_current_reduction_record().max_mem = max_mem;
@@ -195,12 +195,9 @@ int main(int argc, char** argv) {
 	}
 	ripser ripser(config);
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
-	std::cout << std::endl;
+	std::cout << std::endl << std::endl;
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
-	//output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, false);
-	write_short_rr(ripser, "cl");
+	output_info(ripser, std::cout); std::cout << std::endl;
 	exit(0);
 }

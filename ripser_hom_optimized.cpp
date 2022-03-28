@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
 	ripser ripser(config);
 	output_config(ripser, std::cout); std::cout << std::endl;
 	compute_barcodes(ripser);
-	std::cout << std::endl;
+	std::cout << std::endl << std::endl;
 	output_barcode(ripser, std::cout, false); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
 	exit(0);

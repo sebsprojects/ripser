@@ -212,13 +212,9 @@ int main(int argc, char** argv) {
 	}
 	ripser ripser(config);
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
-	std::cout << std::endl;
+	std::cout << std::endl << std::endl;
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, false);
-	//write_analysis_rr(ripser, "_cohom_clearing_opt");
-	write_reduction_record_output(ripser, false, "");
 	exit(0);
 }

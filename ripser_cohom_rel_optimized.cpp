@@ -208,14 +208,10 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 	ripser ripser(config);
-	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
+	std::cout << std::endl << std::endl;
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, false, false);
-	//write_analysis_rr(ripser, "cl-app");
-	write_reduction_record_output(ripser, false, "");
 	exit(0);
 }

@@ -299,7 +299,7 @@ void compute_reps(ripser& ripser,
 			hom_parities[k] = 0;
 			hom_offs[k] = 0;
 		}
-		if(current_simplex == hom_classes.at(hom_class_index).birth) {
+		if(current_simplex == hom_classes.at(hom_class_index).birth.second) {
 			if(active_hom_classes.empty()) {
 				min_simplex = current_simplex;
 			}
@@ -387,13 +387,10 @@ int main(int argc, char** argv) {
 		exit(-1);
 	}
 	ripser ripser(config);
-	std::cout << std::endl;
 	output_config(ripser, std::cout); std::cout << std::endl;
-	//output_simplices(ripser, std::cout, total_filtration_order); std::cout << std::endl;
 	compute_barcodes(ripser);
+	std::cout << std::endl << std::endl;
 	output_barcode(ripser, std::cout, true); std::cout << std::endl;
 	output_info(ripser, std::cout); std::cout << std::endl;
-	//write_standard_output(ripser, true, false);
-	write_short_rr(ripser, "_repinverse");
 	exit(0);
 }
