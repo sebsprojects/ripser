@@ -1,5 +1,7 @@
 This branch of (my fork of) Ripser contains all implemenetations, configs, scripts and most data set developed and used as part of my master thesis project.
 
+**The thesis itself can be downloaded as a pdf from [this repo](https://github.com/sebsprojects/master-thesis).**
+
 ## Compile and Run
 
 All `ripser_*` source files can be compiled with `make`. See `Makefile` for all available builds. All versions are run as `./ripser_* path/to/config.ini`.
